@@ -1,4 +1,4 @@
-const CACHE_NAME = "cargo3d-cache-v1";
+const CACHE_NAME = "cargo3d-cache-v3";
 const APP_SHELL = [
   "/",
   "/index.html",
