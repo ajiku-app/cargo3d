@@ -1,0 +1,3191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Cargo3D Calculator — Kalkulator & Visualisasi Muat Kontainer 3D</title>
+  <meta name="description" content="Kalkulator & visualisasi 3D untuk optimasi muat kontainer 20FT, 40FT, dan 40FT High Cube.">
+
+  <!-- PWA: installable in browser (Add to Home Screen / desktop install) -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0a0d13">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cargo3D">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Type system: Space Grotesk (display) / IBM Plex Sans (UI & body) / IBM Plex Mono (data) -->
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Three.js (3D Graphics) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <!-- OrbitControls for Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- Chart.js (Interactive Progress Charts) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- html2pdf.js for exporting PDFs directly -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    :root {
+      /* Signal orange — cargo/warning-stripe accent, dynamically re-tinted from Pengaturan */
+      --color-brand-50: #fff2ea;
+      --color-brand-100: #ffdfc9;
+      --color-brand-500: #ff5a1f;
+      --color-brand-600: #e64a13;
+      --color-brand-700: #c23c0d;
+      /* Fixed ink + technical teal, independent of the brand re-tint */
+      --ink-950: #0a0d13;
+      --ink-900: #11151d;
+      --ink-800: #1a2029;
+      --ink-700: #262e3a;
+      --teal-500: #14b8bd;
+      --paper: #f5f4f1;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans', sans-serif;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow-x: hidden;
+      background-color: var(--paper);
+    }
+
+    h1, h2, h3, h4, .font-display {
+      font-family: 'Space Grotesk', 'IBM Plex Sans', sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    .font-mono, code, #reportPrintDate, #reportOperator {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    /* Faint blueprint grid — reads as a technical drawing surface, not decoration */
+    .blueprint-grid {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+    .paper-grid {
+      background-image:
+        linear-gradient(rgba(10,13,19,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(10,13,19,0.035) 1px, transparent 1px);
+      background-size: 28px 28px;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #eceae5;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #c9c5bc;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a39e91;
+    }
+
+    .spinner {
+      border: 3px solid #eeece7;
+      border-top: 3px solid var(--color-brand-500);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Corner-bracket motif for the calculator's technical panels — echoes drawing/crop marks */
+    .tech-corners { position: relative; }
+    .tech-corners::before, .tech-corners::after {
+      content: ""; position: absolute; width: 14px; height: 14px;
+      border-color: var(--color-brand-500); pointer-events: none;
+    }
+    .tech-corners::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .tech-corners::after { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    @media print {
+      html, body {
+        background-color: #ffffff !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        height: auto !important;
+        overflow: visible !important;
+      }
+      
+      aside, header, .no-print, #loginView, #loadingOverlay, #notificationArea, #customConfirmModal, .modal-backdrop, #mobile-top-bar {
+        display: none !important;
+      }
+      
+      #blogger-web-app-container, #blogger-web-app-container.hidden {
+        position: relative !important;
+        display: block !important;
+        overflow: visible !important;
+        background: transparent !important;
+        inset: auto !important;
+        height: auto !important;
+        width: 100% !important;
+      }
+      
+      main {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      #section-report, #section-report.hidden {
+        display: block !important;
+        overflow: visible !important;
+        height: auto !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      
+      #section-dashboard, #section-calculator, #section-master, #section-history, #section-users, #section-settings {
+        display: none !important;
+      }
+
+      .print-shadow-none {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+      }
+
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: 'var(--color-brand-50)',
+              100: 'var(--color-brand-100)',
+              500: 'var(--color-brand-500)',
+              600: 'var(--color-brand-600)',
+              700: 'var(--color-brand-700)',
+              950: '#020617',
+            },
+            ink: {
+              700: 'var(--ink-700)',
+              800: 'var(--ink-800)',
+              900: 'var(--ink-900)',
+              950: 'var(--ink-950)',
+            },
+            teal: { 500: 'var(--teal-500)' },
+          },
+          fontFamily: {
+            display: ['Space Grotesk', 'IBM Plex Sans', 'sans-serif'],
+            sans: ['IBM Plex Sans', 'sans-serif'],
+            mono: ['IBM Plex Mono', 'ui-monospace', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="text-slate-800">
+
+  <script>
+    // SAKLAR DEPLOYMENT: Ubah IS_PREVIEW ke false saat dipasang ke Blogger asli yang terhubung ke GAS
+    const IS_PREVIEW = true;
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbxNlqK4zwNN0xvB7zws9WdF2Latk0w9aJoGoUdajB92VFEae37-l1pAArMnzxOX-ZKuLw/exec"; // Masukkan URL Deploy GAS Anda di sini
+  </script>
+
+  <!-- LOADING OVERLAY DENGAN PROGRESS BAR -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/60 z-50 flex items-center justify-center hidden">
+    <div class="bg-white p-8 rounded-lg shadow-2xl flex flex-col items-center max-w-sm w-full text-center border border-slate-100 mx-4">
+      <div class="spinner mb-4"></div>
+      <p id="loadingText" class="text-sm font-semibold text-slate-700">Memproses Data...</p>
+      
+      <div id="progressContainer" class="w-full bg-slate-100 h-2.5 rounded-full mt-4 overflow-hidden hidden">
+        <div id="progressBar" class="bg-brand-600 h-full w-0 transition-all duration-100"></div>
+      </div>
+      <span id="progressText" class="text-xs font-bold text-brand-600 mt-2 hidden">0%</span>
+    </div>
+  </div>
+
+  <div id="notificationArea" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ================= LOGIN WINDOW ================= -->
+  <div id="loginView" class="fixed inset-0 bg-ink-950 z-40 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-3xl rounded-lg shadow-2xl overflow-hidden flex flex-col md:flex-row border border-ink-800">
+
+      <!-- LEFT: identity / manifest panel -->
+      <div class="md:w-[46%] bg-ink-950 text-white p-8 md:p-10 flex flex-col justify-between relative overflow-hidden blueprint-grid">
+        <div class="relative z-10">
+          <div class="w-12 h-12 bg-brand-500/15 border border-brand-500/40 rounded-md flex items-center justify-center mb-8 p-2 dynamic-app-logo">
+            <i class="fa-solid fa-boxes-packing text-xl text-brand-500"></i>
+          </div>
+          <h1 class="font-display text-3xl font-bold tracking-tight leading-[1.05] dynamic-app-title">Cargo3D<br>Calculator</h1>
+          <p class="text-xs text-slate-400 mt-3 leading-relaxed max-w-[26ch] dynamic-app-desc">Sistem Kalkulasi & Visualisasi Kontainer 3D</p>
+        </div>
+
+        <div class="relative z-10 mt-10 pt-6 border-t border-white/10 space-y-2.5 text-[11px] font-mono text-slate-400">
+          <div class="flex justify-between gap-4"><span class="text-slate-500">MANIFEST</span><span class="text-slate-300">ACCESS-TERMINAL</span></div>
+          <div class="flex justify-between gap-4"><span class="text-slate-500">STATUS</span><span class="text-teal-500 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-teal-500 inline-block"></span> READY</span></div>
+          <div class="flex justify-between gap-4"><span class="text-slate-500">BUILD</span><span class="dynamic-trademark text-slate-300">Cargo3D Loader V2.1 Pro</span></div>
+        </div>
+
+        <i class="fa-solid fa-cubes-stacked text-[160px] absolute -right-10 -bottom-10 text-white/[0.04] pointer-events-none"></i>
+      </div>
+
+      <!-- RIGHT: credentials -->
+      <div class="md:w-[54%] p-8 md:p-10 flex flex-col justify-center">
+        <div class="mb-6">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-brand-600">Masuk Terminal</span>
+          <h2 class="font-display text-lg font-bold text-slate-900 mt-1">Verifikasi kredensial operator</h2>
+        </div>
+
+        <div class="space-y-5">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Username</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i class="fa-solid fa-user text-sm"></i>
+              </span>
+              <input type="text" id="loginUser" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition text-sm font-mono" placeholder="Masukkan username..." value="admin">
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between items-center mb-1.5">
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Password</label>
+            </div>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                <i class="fa-solid fa-lock text-sm"></i>
+              </span>
+              <input type="password" id="loginPass" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition text-sm font-mono" placeholder="Masukkan password..." value="admin2026">
+            </div>
+          </div>
+
+          <button onclick="handleLoginSubmit()" class="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-semibold py-3 rounded-md transition shadow-lg shadow-brand-500/20 text-sm">
+            Masuk Aplikasi <i class="fa-solid fa-arrow-right-to-bracket ml-2"></i>
+          </button>
+
+          <p class="text-[11px] text-slate-400 text-center pt-1">Demo lokal — akun tersedia: <span class="font-mono text-slate-500">admin / admin2026</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MAIN WEB APP CONTAINER ================= -->
+  <div id="blogger-web-app-container" class="fixed inset-0 bg-slate-100 z-10 flex hidden overflow-hidden flex-col md:flex-row">
+    
+    <!-- MOBILE TOP BAR NAVBAR -->
+    <header id="mobile-top-bar" class="md:hidden h-14 bg-ink-950 border-b border-ink-800 flex items-center justify-between px-4 shrink-0 text-white z-30 font-medium">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 bg-brand-500/15 border border-brand-500/40 rounded-md flex items-center justify-center text-brand-500 shrink-0 p-1 dynamic-sidebar-logo">
+          <i class="fa-solid fa-truck-ramp-box text-sm"></i>
+        </div>
+        <div>
+          <h2 class="font-display font-bold text-white text-xs leading-none dynamic-app-title">Cargo 3D Loader</h2>
+          <span class="text-[8px] text-brand-500 font-semibold tracking-wider uppercase dynamic-trademark">V2.1 Pro</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="installAppBtnMobile" onclick="triggerInstallPrompt()" class="hidden w-9 h-9 items-center justify-center rounded-md bg-brand-600 text-white transition focus:outline-none">
+          <i class="fa-solid fa-arrow-down-to-line text-sm"></i>
+        </button>
+        <button onclick="toggleMobileMenu()" class="w-10 h-10 flex items-center justify-center rounded-md bg-ink-800 hover:bg-ink-700 text-slate-300 transition focus:outline-none">
+          <i id="mobile-menu-icon" class="fa-solid fa-bars text-lg"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- SIDEBAR NAVIGATION (DESKTOP MODE) -->
+    <aside class="hidden md:flex w-64 bg-ink-950 text-slate-300 flex-col shrink-0 border-r border-ink-800">
+      <div class="p-5 flex items-center gap-3 border-b border-ink-800">
+        <div class="w-9 h-9 bg-brand-500/15 border border-brand-500/40 rounded-md flex items-center justify-center text-brand-500 shrink-0 p-1.5 dynamic-sidebar-logo">
+          <i class="fa-solid fa-truck-ramp-box text-lg"></i>
+        </div>
+        <div>
+          <h2 class="font-display font-bold text-white text-sm leading-tight truncate max-w-[130px] dynamic-app-title">Cargo 3D Loader</h2>
+          <span class="text-[10px] text-brand-500 font-semibold tracking-wider uppercase dynamic-trademark">V2.1 Pro</span>
+        </div>
+      </div>
+
+      <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        <a href="javascript:void(0);" onclick="switchMenu('dashboard')" id="btn-menu-dashboard" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-semibold text-white bg-white/5 shadow-[inset_3px_0_0_0_var(--color-brand-500)]">
+          <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('calculator')" id="btn-menu-calculator" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-boxes-stacked w-5"></i> Kalkulator & 3D
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('report')" id="btn-menu-report" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-file-contract w-5"></i> Laporan Muat
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('master')" id="btn-menu-master" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-cubes w-5"></i> Master Barang
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('history')" id="btn-menu-history" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-clock-rotate-left w-5"></i> Riwayat Muat
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('users')" id="btn-menu-users" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white admin-only hidden">
+          <i class="fa-solid fa-users-gear w-5"></i> Manajemen User
+        </a>
+        <a href="javascript:void(0);" onclick="switchMenu('settings')" id="btn-menu-settings" class="flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-gears w-5"></i> Pengaturan
+        </a>
+      </nav>
+
+      <div class="p-4 border-t border-ink-800 space-y-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-ink-800 rounded-full flex items-center justify-center border border-ink-700">
+            <i class="fa-solid fa-circle-user text-xl text-brand-500"></i>
+          </div>
+          <div class="min-w-0 flex-1">
+            <h4 id="userBarName" class="text-xs font-bold text-white truncate">Administrator</h4>
+            <span id="userBarRole" class="text-[10px] text-slate-400 uppercase tracking-wide">Admin</span>
+          </div>
+        </div>
+        <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 py-2 border border-ink-800 hover:bg-red-950/20 hover:border-red-900/40 text-red-400 text-xs font-semibold rounded-md transition">
+          <i class="fa-solid fa-power-off"></i> Keluar Sistem
+        </button>
+      </div>
+    </aside>
+
+    <!-- MOBILE DRAWER CONTAINER -->
+    <div id="mobile-menu-drawer" class="md:hidden fixed inset-x-0 top-14 bg-ink-950/95 backdrop-blur z-20 transition-all duration-300 transform -translate-y-full border-b border-ink-800 shadow-xl overflow-hidden flex flex-col pointer-events-none">
+      <nav class="p-4 space-y-1 text-slate-300 font-medium">
+        <a href="javascript:void(0);" onclick="switchMobileMenu('dashboard')" id="mob-menu-dashboard" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-white bg-white/5 shadow-[inset_3px_0_0_0_var(--color-brand-500)]">
+          <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('calculator')" id="mob-menu-calculator" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-boxes-stacked w-5"></i> Kalkulator & 3D
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('report')" id="mob-menu-report" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-file-contract w-5"></i> Laporan Muat
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('master')" id="mob-menu-master" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-cubes w-5"></i> Master Barang
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('history')" id="mob-menu-history" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-clock-rotate-left w-5"></i> Riwayat Muat
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('users')" id="mob-menu-users" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white admin-only hidden">
+          <i class="fa-solid fa-users-gear w-5"></i> Manajemen User
+        </a>
+        <a href="javascript:void(0);" onclick="switchMobileMenu('settings')" id="mob-menu-settings" class="flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white">
+          <i class="fa-solid fa-gears w-5"></i> Pengaturan
+        </a>
+      </nav>
+      <div class="p-4 bg-ink-950/80 border-t border-ink-800 flex items-center justify-between text-xs text-slate-400 font-medium">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-circle-user text-brand-500 text-lg"></i>
+          <span id="mobileUserBarName" class="font-bold text-white truncate max-w-[120px]">User</span>
+        </div>
+        <button onclick="handleLogout()" class="text-red-400 hover:text-red-300 font-bold flex items-center gap-1">
+          <i class="fa-solid fa-power-off"></i> Keluar
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT PANEL -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <!-- Top Header Bar -->
+      <header class="hidden md:flex h-16 bg-white border-b border-slate-300 items-center justify-between px-8 shrink-0 font-medium z-10 no-print">
+        <div>
+          <h1 id="mainPageTitle" class="font-display text-lg font-bold text-slate-800">Dashboard Ringkasan</h1>
+          <p class="text-xs text-slate-500 font-mono" id="headerCurrentDate">Senin, 18 Mei 2026</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="flex items-center bg-slate-100 p-1 rounded-md border border-slate-300 gap-1 text-xs">
+            <button onclick="changeLanguage('id')" id="lang-btn-id" class="px-2.5 py-1 rounded font-bold transition flex items-center gap-1.5 bg-white text-slate-800 border border-slate-300">
+              🇮🇩 ID
+            </button>
+            <button onclick="changeLanguage('en')" id="lang-btn-en" class="px-2.5 py-1 rounded font-bold transition flex items-center gap-1.5 text-slate-500 hover:text-slate-800">
+              🇺🇸 EN
+            </button>
+          </div>
+
+          <div class="bg-slate-100 text-slate-700 px-3.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-2 border border-slate-300">
+            <span class="w-2 h-2 rounded-full bg-teal-500 animate-pulse"></span>
+            Database: <span id="dbModeText" class="font-bold font-mono">Preview (Dummy)</span>
+          </div>
+
+          <button id="installAppBtn" onclick="triggerInstallPrompt()" class="hidden items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-1.5 rounded-md text-xs font-bold transition shadow-sm">
+            <i class="fa-solid fa-arrow-down-to-line"></i> Install Aplikasi
+          </button>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-8">
+        
+        <!-- ================= SECTION 1: DASHBOARD ================= -->
+        <section id="section-dashboard" class="space-y-6">
+          <div class="bg-ink-950 text-white rounded-lg p-5 md:p-7 relative overflow-hidden blueprint-grid border border-ink-800">
+            <div class="relative z-10 max-w-xl">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-brand-500">Ringkasan Sistem</span>
+              <h2 class="font-display text-lg md:text-2xl font-bold mt-1 mb-2"><span data-translate="dash_welcome">Selamat Datang di</span> <span class="dynamic-app-title">Cargo3D Loader</span></h2>
+              <p class="text-xs text-slate-400 leading-relaxed dynamic-app-desc max-w-lg" data-translate="dash_banner_desc">Rancang tata letak muatan kontainer 20ft, 40ft, dan 40HC secara instan dengan efisiensi tinggi, visualisasi 3D berwarna, serta hitung sisa ruang volume dan batas berat secara otomatis.</p>
+            </div>
+            <i class="fa-solid fa-boxes-packing text-[120px] md:text-[180px] absolute right-2 -bottom-8 text-white/[0.04] pointer-events-none transform rotate-12"></i>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 font-medium">
+            <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 flex items-center gap-4">
+              <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-cubes-stacked"></i>
+              </div>
+              <div>
+                <span class="text-xs font-semibold text-slate-500 block" data-translate="stat_master">Master Database Barang</span>
+                <span id="statMasterCount" class="text-2xl font-extrabold text-slate-800 font-mono">0</span>
+              </div>
+            </div>
+            <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 flex items-center gap-4">
+              <div class="w-12 h-12 bg-blue-50 text-brand-600 rounded-xl flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-calculator"></i>
+              </div>
+              <div>
+                <span class="text-xs font-semibold text-slate-500 block" data-translate="stat_history">Total Perhitungan Tersimpan</span>
+                <span id="statHistoryCount" class="text-2xl font-extrabold text-slate-800 font-mono">0</span>
+              </div>
+            </div>
+            <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 flex items-center gap-4">
+              <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl shrink-0">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div>
+                <span class="text-xs font-semibold text-slate-500 block" data-translate="stat_users">Akun Pengguna Terdaftar</span>
+                <span id="statUsersCount" class="text-2xl font-extrabold text-slate-800 font-mono">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500" data-translate="spec_title">Spesifikasi Acuan Kontainer Standar</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <!-- Container 20 FT -->
+              <div class="bg-white rounded-lg border border-slate-300 overflow-hidden flex flex-col">
+                <div class="bg-emerald-600 p-4 text-white">
+                  <h4 class="font-bold text-sm">20 FT Standard Container</h4>
+                  <p class="text-[10px] text-emerald-100" data-translate="desc_20ft">Kapasitas Sempit & Efisien</p>
+                </div>
+                <div class="p-5 flex-1 space-y-4 text-xs font-medium">
+                  <div class="grid grid-cols-2 gap-3 text-slate-600">
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxvol">Max Volume</span>
+                      <strong class="text-slate-800">33.17 m³</strong>
+                    </div>
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxwgt">Max Berat</span>
+                      <strong class="text-slate-800">21,800 kg</strong>
+                    </div>
+                  </div>
+                  <hr class="border-slate-100">
+                  <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block mb-1" data-translate="col_dim">Dimensi Dalam (P x L x T)</span>
+                    <strong class="text-slate-800 font-mono">5.90m x 2.35m x 2.39m</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Container 40 FT -->
+              <div class="bg-white rounded-lg border border-slate-300 overflow-hidden flex flex-col">
+                <div class="bg-brand-600 p-4 text-white">
+                  <h4 class="font-bold text-sm">40 FT Standard Container</h4>
+                  <p class="text-[10px] text-brand-100" data-translate="desc_40ft">Standar Industri Cargo Laut</p>
+                </div>
+                <div class="p-5 flex-1 space-y-4 text-xs font-medium">
+                  <div class="grid grid-cols-2 gap-3 text-slate-600">
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxvol">Max Volume</span>
+                      <strong class="text-slate-800">67.65 m³</strong>
+                    </div>
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxwgt">Max Berat</span>
+                      <strong class="text-slate-800">26,500 kg</strong>
+                    </div>
+                  </div>
+                  <hr class="border-slate-100">
+                  <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block mb-1" data-translate="col_dim">Dimensi Dalam (P x L x T)</span>
+                    <strong class="text-slate-800 font-mono">12.03m x 2.35m x 2.39m</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Container 40 HC -->
+              <div class="bg-white rounded-lg border border-slate-300 overflow-hidden flex flex-col">
+                <div class="bg-indigo-600 p-4 text-white">
+                  <h4 class="font-bold text-sm">40 HC (High Cube) Container</h4>
+                  <p class="text-[10px] text-indigo-100" data-translate="desc_40hc">Dimensi Lebih Tinggi (Ekstra Kapasitas)</p>
+                </div>
+                <div class="p-5 flex-1 space-y-4 text-xs font-medium">
+                  <div class="grid grid-cols-2 gap-3 text-slate-600">
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxvol">Max Volume</span>
+                      <strong class="text-slate-800">76.12 m³</strong>
+                    </div>
+                    <div>
+                      <span class="text-[10px] uppercase font-semibold text-slate-400 block" data-translate="col_maxwgt">Max Berat</span>
+                      <strong class="text-slate-800">26,500 kg</strong>
+                    </div>
+                  </div>
+                  <hr class="border-slate-100">
+                  <div>
+                    <span class="text-[10px] uppercase font-semibold text-slate-400 block mb-1" data-translate="col_dim">Dimensi Dalam (P x L x T)</span>
+                    <strong class="text-slate-800 font-mono">12.03m x 2.35m x 2.69m</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 2: KALKULATOR & SIMULASI 3D ================= -->
+        <section id="section-calculator" class="hidden space-y-6">
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            
+            <!-- LEFT INPUT FORMS -->
+            <div class="xl:col-span-5 space-y-6">
+              <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <i class="fa-solid fa-file-invoice text-brand-600"></i> Informasi Muatan
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-medium text-xs">
+                  <div>
+                    <label class="block text-slate-500 mb-1">Nama Proyek / Klien</label>
+                    <input type="text" id="project_name" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="Contoh: PT. Ekspor Sentosa">
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Pilih Tipe Kontainer</label>
+                    <select id="container_type" onchange="updateContainerSelection()" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                      <option value="20ft">20 FT Standard (33.17 m³)</option>
+                      <option value="40ft">40 FT Standard (67.65 m³)</option>
+                      <option value="40hc" selected>40 FT High Cube (76.12 m³)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-box text-brand-600"></i> Pilih & Tambah Barang
+                  </h3>
+                  <button onclick="openAddCargoModal()" class="text-[11px] font-bold text-brand-600 hover:text-brand-700 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition">
+                    + Input Kustom
+                  </button>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-500 mb-1">Pilih dari Database Master</label>
+                  <select id="cargo_selector" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-brand-500 focus:outline-none" onchange="handleDropdownCargoSelect()">
+                    <option value="">-- Pilih Barang di Sini --</option>
+                  </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 font-medium text-xs">
+                  <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Jumlah Unit (Pcs)</label>
+                    <input type="number" id="inputQty" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="Contoh: 150" min="1">
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Total Berat Tambahan</label>
+                    <div class="flex items-center bg-slate-50 border border-slate-300 rounded-lg overflow-hidden">
+                      <input type="number" id="inputWeightAuto" class="w-full px-3 py-2 bg-transparent text-xs font-semibold focus:outline-none" placeholder="Berat total kg" readonly>
+                      <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-2 border-l border-slate-300 shrink-0">KG</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button onclick="addSelectedCargoToList()" class="w-full bg-brand-600 hover:bg-brand-700 active:scale-95 text-white py-2.5 rounded-xl text-xs font-bold transition">
+                  Masukkan Ke Daftar Muat <i class="fa-solid fa-plus ml-1.5"></i>
+                </button>
+              </div>
+
+              <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                  <h3 class="font-bold text-slate-800 text-sm">
+                    Daftar Barang yang Dimasukkan (<span id="cargoListBadge">0</span>)
+                  </h3>
+                  <button onclick="clearAllSelectedCargo()" class="text-[10px] font-bold text-red-500 hover:underline">Hapus Semua</button>
+                </div>
+
+                <div class="overflow-x-auto max-h-60">
+                  <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 text-slate-400 uppercase tracking-wider text-[9px] border-b border-slate-100">
+                      <tr>
+                        <th class="py-2 px-3">Nama Barang</th>
+                        <th class="py-2 px-2 text-center">Ukuran (cm)</th>
+                        <th class="py-2 px-2 text-center">Jumlah</th>
+                        <th class="py-2 px-2 text-center">Berat (kg)</th>
+                        <th class="py-2 px-3 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody id="loadedCargoTableBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                      <tr>
+                        <td colspan="5" class="text-center py-6 text-slate-400 italic">Belum ada barang dimasukkan.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 pt-2">
+                  <button onclick="runSimulationCalculation()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition active:scale-95 shadow-lg shadow-emerald-500/15">
+                    <i class="fa-solid fa-cube mr-1.5"></i> Hitung (3D)
+                  </button>
+                  <button onclick="saveCurrentCalculationToHistory()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 rounded-xl text-xs transition active:scale-95">
+                    <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i> Simpan
+                  </button>
+                </div>
+              </div>
+
+              <div id="overloadContainerPanel" class="bg-red-50 border border-red-100 p-5 md:p-6 rounded-lg space-y-3 hidden">
+                <h4 class="font-bold text-red-800 text-sm flex items-center gap-2">
+                  <i class="fa-solid fa-triangle-exclamation text-red-600 animate-pulse"></i> Rincian Barang Tidak Termuat (Overload)
+                </h4>
+                <p class="text-[11px] text-red-700 leading-relaxed">
+                  Kapasitas fisik kontainer telah penuh atau berat kargo melebihi batas muat aman maksimum. Barang di bawah ini tidak dapat dimasukkan:
+                </p>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-red-900">
+                    <thead>
+                      <tr class="border-b border-red-200 text-[10px] font-bold uppercase tracking-wider text-red-600">
+                        <th class="py-1 px-1">Nama Barang</th>
+                        <th class="py-1 px-1 text-center">Qty Sisa</th>
+                        <th class="py-1 px-1 text-center">Vol Total (m³)</th>
+                        <th class="py-1 px-1 text-center">Berat (kg)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="overloadTableBody" class="divide-y divide-red-200 font-medium">
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT 3D CANVAS & RESULT -->
+            <div class="xl:col-span-7 space-y-6">
+              <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4 flex flex-col h-[400px] md:h-[520px]">
+                <div class="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+                  <div>
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <i class="fa-solid fa-magnifying-glass-3d text-brand-600"></i> Visualisasi Kontainer 3D (Optimasi Dinamis)
+                    </h3>
+                    <p class="text-[10px] text-slate-400 hidden md:block">Gunakan mouse: Klik & Seret untuk rotasi | Scroll untuk zoom</p>
+                  </div>
+                  <div id="loading3DIndicator" class="hidden text-xs text-brand-500 font-bold flex items-center gap-1.5 bg-brand-50 px-2.5 py-1 rounded-md">
+                    <div class="spinner !w-3.5 !h-3.5 border-t-brand-500"></div> Render...
+                  </div>
+                </div>
+
+                <div id="canvas3dContainer" class="flex-1 rounded-xl overflow-hidden bg-slate-950 relative border border-slate-800">
+                  <div class="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-lg p-2.5 text-[9px] text-slate-300 space-y-1 z-10 font-mono">
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-1 bg-red-500 inline-block rounded-full"></span> Sisi Panjang (X)</div>
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-1 bg-green-500 inline-block rounded-full"></span> Sisi Lebar (Y)</div>
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-1 bg-blue-500 inline-block rounded-full"></span> Sisi Tinggi (Z)</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gauges -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+                  <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Utilisasi Volume Kontainer</span>
+                    <span id="volUsePercent" class="text-sm font-extrabold text-brand-600">0.00%</span>
+                  </div>
+                  <div class="flex items-center gap-6">
+                    <div class="w-1/2">
+                      <canvas id="chartVolumeRing" class="max-w-[100px] max-h-[100px] md:max-w-[120px] md:max-h-[120px] mx-auto"></canvas>
+                    </div>
+                    <div class="w-1/2 space-y-2 text-xs font-medium">
+                      <div>
+                        <span class="text-slate-400 block text-[10px]">TOTAL DIISI</span>
+                        <strong id="volUsedText" class="text-slate-800 text-sm">0.00 m³</strong>
+                      </div>
+                      <div>
+                        <span class="text-slate-400 block text-[10px]">SISA RUANG KOSONG</span>
+                        <strong id="volRemainingText" class="text-emerald-600 text-sm">0.00 m³ (100.00%)</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+                  <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Utilisasi Beban Berat</span>
+                    <span id="wgtUsePercent" class="text-sm font-extrabold text-brand-600">0.00%</span>
+                  </div>
+                  <div class="flex items-center gap-6">
+                    <div class="w-1/2">
+                      <canvas id="chartWeightRing" class="max-w-[100px] max-h-[100px] md:max-w-[120px] md:max-h-[120px] mx-auto"></canvas>
+                    </div>
+                    <div class="w-1/2 space-y-2 text-xs font-medium">
+                      <div>
+                        <span class="text-slate-400 block text-[10px]">TOTAL BEBAN</span>
+                        <strong id="wgtUsedText" class="text-slate-800 text-sm">0.00 kg</strong>
+                      </div>
+                      <div>
+                        <span class="text-slate-400 block text-[10px]">SISA BATAS AMAN</span>
+                        <strong id="wgtRemainingText" class="text-emerald-600 text-sm font-bold">0.00 kg (100.00%)</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 6: LAPORAN MUAT & VIEW 2D ================= -->
+        <section id="section-report" class="hidden space-y-6">
+          <div class="flex justify-between items-center bg-white p-5 md:p-6 rounded-lg border border-slate-300 no-print">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Arsip Cetak & Layout 2D Laporan</h3>
+              <p class="text-xs text-slate-500 hidden md:block">Tinjau, evaluasi proyeksi spasial, dan unduh dokumen fisik laporan pemuatan kargo.</p>
+            </div>
+            <button onclick="triggerPrintProcess()" class="bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-bold py-2 px-4 md:py-2.5 md:px-5 rounded-xl text-xs transition flex items-center gap-2 shadow-md shadow-brand-500/10 shrink-0">
+              <i class="fa-solid fa-file-pdf"></i> Cetak Laporan / PDF
+            </button>
+          </div>
+
+          <!-- Printable Document Container -->
+          <div id="pdf-report-content" class="bg-white p-5 md:p-10 rounded-lg border border-slate-300 space-y-6 md:space-y-8 print-shadow-none">
+            <!-- Header Laporan -->
+            <div class="flex flex-col md:flex-row justify-between items-start border-b border-slate-300 pb-6 gap-4">
+              <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white shrink-0 p-2 dynamic-app-logo">
+                  <i class="fa-solid fa-boxes-packing text-2xl"></i>
+                </div>
+                <div>
+                  <h2 class="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight dynamic-app-title">Cargo3D Loading Report</h2>
+                  <p class="text-[10px] md:text-xs text-slate-500 dynamic-app-desc">Sistem Optimasi Tata Letak Spasial Kontainer</p>
+                </div>
+              </div>
+              <div class="text-left md:text-right text-xs text-slate-500 font-medium space-y-1">
+                <p>Tanggal Cetak: <span id="reportPrintDate" class="font-bold text-slate-800">-</span></p>
+                <p>Operator: <span id="reportOperator" class="font-bold text-slate-800">-</span></p>
+              </div>
+            </div>
+
+            <!-- Detail Proyek -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 bg-slate-50 p-5 md:p-6 rounded-xl border border-slate-100">
+              <div class="space-y-2 text-xs font-semibold">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Informasi Pengiriman</span>
+                <p class="text-sm font-bold text-slate-800">Proyek: <span id="reportProjectName" class="text-brand-600">PT. Ekspor Sentosa</span></p>
+                <p class="font-medium text-slate-600">Jenis Kontainer: <span id="reportContainerName" class="font-bold text-slate-800">-</span></p>
+              </div>
+              <div class="space-y-2 text-xs font-semibold">
+                <span class="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Kapasitas Maksimum</span>
+                <p class="font-medium text-slate-600">Batas Maks Volume: <span id="reportMaxVol" class="font-bold text-slate-800">0 m³</span></p>
+                <p class="font-medium text-slate-600">Batas Maks Berat: <span id="reportMaxWeight" class="font-bold text-slate-800">0 kg</span></p>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-bold">
+                  <span class="text-slate-500 uppercase">Utilisasi Ruang Volume</span>
+                  <span id="reportVolPercent" class="text-brand-600">0.00%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                  <div id="reportVolProgressBar" class="bg-brand-600 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-medium text-slate-500">
+                  <span>Terpakai: <strong id="reportVolUsed" class="text-slate-800">0.00 m³</strong></span>
+                  <span>Sisa: <strong id="reportVolRem" class="text-emerald-600">0.00 m³</strong></span>
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <div class="flex justify-between text-xs font-bold">
+                  <span class="text-slate-500 uppercase">Utilisasi Beban Berat</span>
+                  <span id="reportWeightPercent" class="text-emerald-600">0.00%</span>
+                </div>
+                <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                  <div id="reportWeightProgressBar" class="bg-emerald-500 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <div class="flex justify-between text-[11px] font-medium text-slate-500">
+                  <span>Terpakai: <strong id="reportWeightUsed" class="text-slate-800">0.0 kg</strong></span>
+                  <span>Sisa: <strong id="reportWeightRem" class="text-emerald-600">0.0 kg</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- PROYEKSI LAYOUT 2D CONTAINER -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <i class="fa-solid fa-shapes text-brand-500"></i> Proyeksi Spasial Layout 2D (Sesuai Skala)
+              </h3>
+              
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+                <div class="border border-slate-300 rounded-lg p-4 bg-slate-50 text-center space-y-2 print-shadow-none">
+                  <span class="text-[10px] font-bold uppercase text-slate-500 block">Proyeksi Atas (Top View - Sumbu X & Z)</span>
+                  <div class="overflow-x-auto flex justify-center">
+                    <canvas id="canvas2dTop" width="480" height="150" class="border border-slate-300 bg-white rounded-lg max-w-full"></canvas>
+                  </div>
+                  <p class="text-[9px] text-slate-400 font-medium">Panjang Kontainer (X) horizontal, Lebar Kontainer (Z) vertikal</p>
+                </div>
+
+                <div class="border border-slate-300 rounded-lg p-4 bg-slate-50 text-center space-y-2 print-shadow-none">
+                  <span class="text-[10px] font-bold uppercase text-slate-500 block">Proyeksi Samping (Side View - Sumbu X & Y)</span>
+                  <div class="overflow-x-auto flex justify-center">
+                    <canvas id="canvas2dSide" width="480" height="150" class="border border-slate-300 bg-white rounded-lg max-w-full"></canvas>
+                  </div>
+                  <p class="text-[9px] text-slate-400 font-medium">Panjang Kontainer (X) horizontal, Tinggi Tumpukan (Y) vertikal</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- ANALISA AI INSIGHTS DESK & SAFETY MANIFEST -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <i class="fa-solid fa-brain text-indigo-500"></i> AI Insights Desk & Safety Manifest (Analisa Spasial & Risiko Teknis)
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                <div class="border border-indigo-100 rounded-lg p-5 bg-indigo-50/20 text-xs space-y-3 print-shadow-none">
+                  <span class="text-[10px] font-bold uppercase text-indigo-600 flex items-center gap-1.5">
+                    <i class="fa-solid fa-truck-ramp-box"></i> Analisis Spasial & Logistik
+                  </span>
+                  <div class="space-y-2 font-medium text-slate-700">
+                    <p><strong>Pola Penataan Sumbu:</strong> <span id="reportAiPola" class="font-semibold text-slate-800">-</span></p>
+                    <p><strong>Batas Susunan Maksimum (Stacking Index):</strong> <span id="reportAiStacking" class="font-semibold text-slate-800">-</span></p>
+                    <p><strong>Rekomendasi Distribusi Ruang:</strong> <span id="reportAiSpaceAdvice" class="font-semibold text-slate-800">-</span></p>
+                  </div>
+                </div>
+                <div class="border border-emerald-100 rounded-lg p-5 bg-emerald-50/20 text-xs space-y-3 print-shadow-none">
+                  <span class="text-[10px] font-bold uppercase text-emerald-600 flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved"></i> Analisis Risiko & Safety Manifest
+                  </span>
+                  <div class="space-y-2 font-medium text-slate-700">
+                    <p><strong>Distribusi Titik Beban:</strong> <span id="reportAiBeban" class="font-semibold text-slate-800">-</span></p>
+                    <p><strong>Stabilitas Struktural (Defleksi):</strong> <span id="reportAiDefleksi" class="font-semibold text-slate-800">-</span></p>
+                    <p><strong>Rekomendasi Teknis Pengamanan:</strong> <span id="reportAiSafetyAdvice" class="font-semibold text-slate-800">-</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TABEL 1: BARANG TERMUAT -->
+            <div class="space-y-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-500"></i> Daftar Produk Berhasil Dimuat (Termuat)
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="bg-slate-100 text-slate-600 uppercase font-bold text-[9px] border-b border-slate-300">
+                      <th class="py-2.5 px-3">Nama Barang</th>
+                      <th class="py-2.5 px-2 text-center">Ukuran Kotak (cm)</th>
+                      <th class="py-2.5 px-2 text-center">Volume / Unit</th>
+                      <th class="py-2.5 px-2 text-center">Berat / Unit</th>
+                      <th class="py-2.5 px-2 text-center">Qty Dimuat</th>
+                      <th class="py-2.5 px-2 text-center">Total Volume</th>
+                      <th class="py-2.5 px-3 text-right">Total Berat</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportLoadedTableBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TABEL 2: BARANG MELEBIHI KAPASITAS (OVERLOAD) -->
+            <div id="reportOverloadWrapper" class="space-y-3 hidden">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-red-500 flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 animate-pulse"></i> Sisa Kargo Tidak Termuat (Overload / Melebihi Batas)
+              </h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse border border-red-100">
+                  <thead>
+                    <tr class="bg-red-50 text-red-700 uppercase font-bold text-[9px] border-b border-red-200">
+                      <th class="py-2.5 px-3">Nama Barang</th>
+                      <th class="py-2.5 px-2 text-center">Ukuran Kotak (cm)</th>
+                      <th class="py-2.5 px-2 text-center">Volume Satuan</th>
+                      <th class="py-2.5 px-2 text-center">Berat Satuan</th>
+                      <th class="py-2.5 px-2 text-center text-red-600 font-bold">Qty Tidak Muat</th>
+                      <th class="py-2.5 px-2 text-center">Volume Sisa (m³)</th>
+                      <th class="py-2.5 px-3 text-right">Berat Sisa (kg)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportOverloadTableBody" class="divide-y divide-red-50 font-medium text-red-900">
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Catatan Kaki Lembar Cetak -->
+            <div class="pt-8 border-t border-slate-300 flex justify-between items-center text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+              <span class="dynamic-app-title">Sistem Kalkulator Logistik Cargo3D</span>
+              <span>Dokumen Resmi Hasil Verifikasi Spasial Kontainer</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 7: SETTINGS / PENGATURAN ================= -->
+        <section id="section-settings" class="hidden space-y-6">
+          <div class="bg-white p-5 md:p-8 rounded-lg border border-slate-300 space-y-6 max-w-4xl font-medium">
+            <div class="border-b border-slate-100 pb-4">
+              <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                <i class="fa-solid fa-gears text-brand-600"></i> Pengaturan Aplikasi & Branding
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">Sesuaikan nama platform, logo, identitas hak cipta, serta warna dasar UI aplikasi Anda.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs font-semibold">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-slate-500 mb-1.5">Judul Utama Aplikasi</label>
+                  <input type="text" id="set_appTitle" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1.5">Deskripsi / Slogan Aplikasi</label>
+                  <textarea id="set_appDesc" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none resize-none"></textarea>
+                </div>
+              </div>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-slate-500 mb-1.5">Footer Created By</label>
+                  <input type="text" id="set_createdBy" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div>
+                  <label class="block text-slate-500 mb-1.5">Keterangan Hak Cipta / Trademark</label>
+                  <input type="text" id="set_trademark" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-6">
+              <h4 class="font-bold text-slate-700 text-xs mb-4">Pengaturan Logo Aplikasi</h4>
+              <div class="flex flex-col md:flex-row items-start md:items-center gap-6">
+                <div class="w-24 h-24 bg-slate-900 border border-slate-800 rounded-lg flex items-center justify-center p-3 shrink-0 dynamic-app-logo overflow-hidden">
+                  <i class="fa-solid fa-boxes-packing text-3xl text-white"></i>
+                </div>
+                
+                <div class="flex-1 space-y-3 text-xs w-full">
+                  <div>
+                    <label class="block text-slate-500 mb-1">Metode 1: Unggah Gambar Logo (PNG Transparan)</label>
+                    <input type="file" id="set_logoFile" accept="image/*" onchange="handleLogoUpload(this)" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100">
+                  </div>
+                  <div>
+                    <label class="block text-slate-500 mb-1">Metode 2: Menggunakan Link / URL Logo Eksternal</label>
+                    <input type="text" id="set_logoUrl" oninput="handleLogoUrlInput(this.value)" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none text-slate-600" placeholder="https://domain.com/path-to-image.png">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-6">
+              <h4 class="font-bold text-slate-700 text-xs mb-4">Warna Aksen Tema Aplikasi</h4>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div class="space-y-2">
+                  <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Pilih Preset Warna Elegan</span>
+                  <div class="flex flex-wrap gap-2">
+                    <button onclick="applyPresetTheme('#3b82f6')" class="w-8 h-8 rounded-full bg-blue-500 border-2 border-white ring-2 ring-transparent hover:ring-blue-500 transition duration-150" title="Ocean Blue"></button>
+                    <button onclick="applyPresetTheme('#10b981')" class="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white ring-2 ring-transparent hover:ring-emerald-500 transition duration-150" title="Emerald Green"></button>
+                    <button onclick="applyPresetTheme('#6366f1')" class="w-8 h-8 rounded-full bg-indigo-500 border-2 border-white ring-2 ring-transparent hover:ring-indigo-500 transition duration-150" title="Indigo Night"></button>
+                    <button onclick="applyPresetTheme('#f97316')" class="w-8 h-8 rounded-full bg-orange-500 border-2 border-white ring-2 ring-transparent hover:ring-orange-500 transition duration-150" title="Sunset Orange"></button>
+                    <button onclick="applyPresetTheme('#f43f5e')" class="w-8 h-8 rounded-full bg-rose-500 border-2 border-white ring-2 ring-transparent hover:ring-rose-500 transition duration-150" title="Rose Red"></button>
+                    <button onclick="applyPresetTheme('#8b5cf6')" class="w-8 h-8 rounded-full bg-violet-500 border-2 border-white ring-2 ring-transparent hover:ring-violet-500 transition duration-150" title="Violet Purple"></button>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-slate-500 text-xs mb-1.5">Atau Tentukan Warna Kustom Anda (Hex)</label>
+                  <div class="flex gap-2">
+                    <input type="color" id="set_themeColorPicker" onchange="applyCustomThemeColor(this.value)" class="w-10 h-10 border-0 rounded-lg p-0 cursor-pointer">
+                    <input type="text" id="set_themeColorHex" onchange="applyCustomThemeColor(this.value)" class="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-mono focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="#3b82f6">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-100 pt-6 flex justify-end gap-3 text-xs">
+              <button onclick="resetToDefaultSettings()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition">Atur Ulang ke Default</button>
+              <button onclick="saveAllSettings()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 active:scale-95 text-white font-bold rounded-xl transition flex items-center gap-2 shadow-lg shadow-brand-500/10">
+                <i class="fa-solid fa-cloud-arrow-up"></i> Simpan Konfigurasi
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 3: DATABASE MASTER BARANG ================= -->
+        <section id="section-master" class="hidden space-y-6">
+          <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="font-bold text-slate-800 text-sm">Database Master Barang</h3>
+                <p class="text-xs text-slate-500">Daftar item kargo untuk memudahkan kalkulasi tanpa perlu mengetik ulang</p>
+              </div>
+              <button onclick="openMasterCargoModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition self-start md:self-auto font-bold">
+                + Tambah Master Barang Baru
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-400 uppercase font-bold tracking-wider text-[10px] border-b border-slate-300">
+                    <th class="py-3 px-4">Nama Barang</th>
+                    <th class="py-3 px-4 text-center">Panjang (cm)</th>
+                    <th class="py-3 px-4 text-center">Lebar (cm)</th>
+                    <th class="py-3 px-4 text-center">Tinggi (cm)</th>
+                    <th class="py-3 px-4 text-center">Berat / Unit (kg)</th>
+                    <th class="py-3 px-4 text-center">Volume Satuan (m³)</th>
+                    <th class="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="masterCargoTableBody" class="divide-y divide-slate-100 text-slate-700 font-medium">
+                  <tr>
+                    <td colspan="7" class="text-center py-8 text-slate-400 italic">Memuat data kargo...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 4: RIWAYAT PERHITUNGAN ================= -->
+        <section id="section-history" class="hidden space-y-6">
+          <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+            <div>
+              <h3 class="font-bold text-slate-800 text-sm">Riwayat Muat & Kalkulasi</h3>
+              <p class="text-xs text-slate-500">Menyimpan dan mengelola daftar perhitungan kalkulasi yang telah selesai diarsipkan</p>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-400 uppercase font-bold tracking-wider text-[10px] border-b border-slate-300">
+                    <th class="py-3 px-4">Tanggal Kalkulasi</th>
+                    <th class="py-3 px-4">Nama Proyek</th>
+                    <th class="py-3 px-4 text-center">Tipe Kontainer</th>
+                    <th class="py-3 px-4 text-center">Total Barang</th>
+                    <th class="py-3 px-4 text-center">Utilisasi Vol</th>
+                    <th class="py-3 px-4 text-center">Utilisasi Berat</th>
+                    <th class="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="historyTableBody" class="divide-y divide-slate-100 text-slate-700 font-medium">
+                  <tr>
+                    <td colspan="7" class="text-center py-8 text-slate-400 italic">Belum ada riwayat perhitungan disimpan.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= SECTION 5: MANAJEMEN USER ================= -->
+        <section id="section-users" class="hidden space-y-6">
+          <div class="bg-white p-5 md:p-6 rounded-lg border border-slate-300 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-3">
+              <div>
+                <h3 class="font-bold text-slate-800 text-sm">Manajemen Operator Pengguna</h3>
+                <p class="text-xs text-slate-500">Mengelola kredensial log masuk dan hak akses ke aplikasi</p>
+              </div>
+              <button onclick="openUserModal()" class="bg-brand-600 hover:bg-brand-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition self-start md:self-auto">
+                + Tambah Akun Baru
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-400 uppercase font-bold tracking-wider text-[10px] border-b border-slate-300">
+                    <th class="py-3 px-4">Nama Lengkap</th>
+                    <th class="py-3 px-4">Username</th>
+                    <th class="py-3 px-4">Sandi Akses</th>
+                    <th class="py-3 px-4 text-center">Hak Akses (Role)</th>
+                    <th class="py-3 px-4 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody" class="divide-y divide-slate-100 text-slate-700 font-medium">
+                  <tr>
+                    <td colspan="5" class="text-center py-8 text-slate-400 italic">Memuat data user...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- ================= MODALS & POPUPS ================= -->
+  <!-- MODAL: INPUT CUSTOM CARGO -->
+  <div id="modalAddCargo" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-lg rounded-lg shadow-2xl overflow-hidden border border-slate-100">
+      <div class="bg-brand-600 p-4 text-white flex justify-between items-center">
+        <h4 class="font-bold text-sm">Formulir Kargo Kustom</h4>
+        <button onclick="closeAddCargoModal()" class="hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="p-6 space-y-4 text-xs font-semibold">
+        <div>
+          <label class="block text-slate-500 mb-1">Nama Barang Kustom</label>
+          <input type="text" id="customCargoName" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="Masukkan nama barang...">
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-slate-500 mb-1">Panjang (cm)</label>
+            <input type="number" id="customCargoLength" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="cth: 50">
+          </div>
+          <div>
+            <label class="block text-slate-500 mb-1">Lebar (cm)</label>
+            <input type="number" id="customCargoWidth" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="cth: 40">
+          </div>
+          <div>
+            <label class="block text-slate-500 mb-1">Tinggi (cm)</label>
+            <input type="number" id="customCargoHeight" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="cth: 30">
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-500 mb-1">Berat Satuan (kg)</label>
+          <input type="number" id="customCargoWeight" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none" placeholder="cth: 15">
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <button onclick="closeAddCargoModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg transition text-slate-600">Batal</button>
+          <button onclick="submitCustomCargo()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition shadow-brand-500/10">Simpan & Pilih</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT MASTER CARGO -->
+  <div id="modalMasterCargo" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-lg shadow-2xl overflow-hidden border border-slate-100">
+      <div class="bg-brand-600 p-4 text-white flex justify-between items-center">
+        <h4 id="masterCargoModalTitle" class="font-bold text-sm">Tambah Master Barang Baru</h4>
+        <button onclick="closeMasterCargoModal()" class="hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="hidden" id="masterCargoId">
+      <div class="p-6 space-y-4 text-xs font-semibold">
+        <div>
+          <label class="block text-slate-500 mb-1">Nama Deskripsi Kargo</label>
+          <input type="text" id="masterCargoName" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="block text-slate-500 mb-1">Panjang (cm)</label>
+            <input type="number" id="masterCargoLength" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-500 mb-1">Lebar (cm)</label>
+            <input type="number" id="masterCargoWidth" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-500 mb-1">Tinggi (cm)</label>
+            <input type="number" id="masterCargoHeight" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="block text-slate-500 mb-1">Berat Satuan (kg)</label>
+          <input type="number" id="masterCargoWeight" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+        </div>
+        <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <button onclick="closeMasterCargoModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg text-slate-600 transition">Batal</button>
+          <button onclick="saveMasterCargo()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition">Simpan Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT USER -->
+  <div id="modalUser" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-lg shadow-2xl overflow-hidden border border-slate-100">
+      <div class="bg-brand-600 p-4 text-white flex justify-between items-center">
+        <h4 id="userModalTitle" class="font-bold text-sm">Tambah Akun Baru</h4>
+        <button onclick="closeUserModal()" class="hover:text-slate-200"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="hidden" id="userId">
+      <div class="p-6 space-y-4 text-xs">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Nama Lengkap</label>
+            <input type="text" id="userFullName" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Hak Akses (Role)</label>
+            <select id="userRole" onchange="togglePermissionsArea(this.value)" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg font-semibold focus:ring-1 focus:ring-brand-500 focus:outline-none">
+              <option value="Operator">Operator Gudang</option>
+              <option value="Admin">Administrator</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Username</label>
+            <input type="text" id="userUsername" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-slate-500 font-semibold mb-1">Password</label>
+            <input type="text" id="userPassword" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-1 focus:ring-brand-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div id="permissionsArea" class="bg-slate-50 p-4 rounded-xl border border-slate-300 space-y-2.5">
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block"><i class="fa-solid fa-shield-halved text-brand-600 mr-1.5"></i> Perizinan Navigasi Menu Operator</span>
+          
+          <div class="grid grid-cols-2 gap-3 font-semibold text-slate-600">
+            <label class="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition">
+              <input type="checkbox" id="perm_calculator" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+              Kalkulator & 3D
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition">
+              <input type="checkbox" id="perm_report" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+              Laporan Muat
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition">
+              <input type="checkbox" id="perm_master" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+              Master Barang
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition">
+              <input type="checkbox" id="perm_history" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+              Riwayat Muat
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-slate-800 transition">
+              <input type="checkbox" id="perm_settings" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300">
+              Pengaturan
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+          <button onclick="closeUserModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg text-slate-600 transition">Batal</button>
+          <button onclick="saveUser()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-lg transition">Simpan Akun</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CUSTOM CONFIRMATION -->
+  <div id="customConfirmModal" class="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[100] hidden items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-lg shadow-2xl overflow-hidden border border-slate-100 p-6 space-y-4 transform scale-95 transition-all duration-250">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-lg shrink-0">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-800 text-sm">Konfirmasi Tindakan</h4>
+          <p id="confirmMessage" class="text-xs text-slate-500">Apakah Anda yakin ingin menghapus data ini?</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 pt-3 border-t border-slate-100 text-xs">
+        <button onclick="closeConfirmModal(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 font-bold rounded-lg text-slate-600 transition">Batal</button>
+        <button onclick="closeConfirmModal(true)" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition shadow-red-500/10">Ya, Hapus</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= APP CORE LOGIC & CONTROLLER ================= -->
+  <script>
+    const TRANSLATIONS = {
+      id: {
+        dash_welcome: "Selamat Datang di",
+        dash_banner_desc: "Rancang tata letak muatan kontainer 20ft, 40ft, dan 40HC secara instan dengan efisiensi tinggi, visualisasi 3D berwarna, serta hitung sisa ruang volume dan batas berat secara otomatis.",
+        stat_master: "Master Database Barang",
+        stat_history: "Total Perhitungan Tersimpan",
+        stat_users: "Akun Pengguna Terdaftar",
+        spec_title: "Spesifikasi Acuan Kontainer Standar",
+        desc_20ft: "Kapasitas Sempit & Efisien",
+        desc_40ft: "Standar Industri Cargo Laut",
+        desc_40hc: "Dimensi Lebih Tinggi (Ekstra Kapasitas)",
+        col_maxvol: "Max Volume",
+        col_maxwgt: "Max Berat",
+        col_dim: "Dimensi Dalam (P x L x T)"
+      },
+      en: {
+        dash_welcome: "Welcome to",
+        dash_banner_desc: "Plan container cargo layouts for 20ft, 40ft, and 40HC instantly with high efficiency, color-coded 3D visualization, and automated cargo volume & safe weight calculation.",
+        stat_master: "Cargo Master Database",
+        stat_history: "Total Saved Calculations",
+        stat_users: "Registered User Accounts",
+        spec_title: "Standard Container Specification Reference",
+        desc_20ft: "Compact & Space Efficient Capacity",
+        desc_40ft: "Maritime Cargo Industry Standard",
+        desc_40hc: "Higher Dimension (Extra Storage Volume)",
+        col_maxvol: "Max Volume Capacity",
+        col_maxwgt: "Max Weight Bound",
+        col_dim: "Internal Dimension (L x W x H)"
+      }
+    };
+
+    let CURRENT_LANG = "id";
+
+    let APP_SETTINGS = {
+      appTitle: "Cargo3D Calculator",
+      appDesc: "Sistem Kalkulasi & Visualisasi Kontainer 3D",
+      logoUrl: "",
+      themeColor: "#ff5a1f",
+      createdBy: "Administrator",
+      trademark: "Cargo3D Loader V2.1 Pro"
+    };
+
+    let DB_CARGO_MASTER = [
+      { id: "crg-01", nama_barang: "Karton Kopi Instan", panjang_cm: 40, lebar_cm: 30, tinggi_cm: 30, berat_kg: 12 },
+      { id: "crg-02", nama_barang: "Karton Mie Instan", panjang_cm: 35, lebar_cm: 25, tinggi_cm: 20, berat_kg: 8 },
+      { id: "crg-03", nama_barang: "Box Elektronik LCD", panjang_cm: 95, lebar_cm: 15, tinggi_cm: 55, berat_kg: 18 },
+      { id: "crg-04", nama_barang: "Furnitur Kursi Lipat", panjang_cm: 80, lebar_cm: 40, tinggi_cm: 40, berat_kg: 24 }
+    ];
+
+    let DB_USERS = [
+      { id: "usr-admin", nama: "Administrator Utama", username: "admin", password: "admin2026", role: "Admin", allowedMenus: ["calculator", "report", "master", "history", "settings"] },
+      { id: "usr-op", nama: "Operator Gudang", username: "peserta", password: "edudigital", role: "Operator", allowedMenus: ["calculator", "report", "master", "history"] }
+    ];
+
+    let DB_RIWAYAT = [
+      { id_kalkulasi: "calc-1", tanggal: "2026-05-18 10:15", username: "peserta", nama_proyek: "Kargo Tekstil PT. Maju", tipe_container: "20ft", total_barang: 120, vol_terpakai: 14.4, persen_vol: 43.41, berat_terpakai: 1440, persen_berat: 6.6, rincian_json: "[]" }
+    ];
+
+    let CURRENT_USER = null;
+    let SELECTED_CARGO_ITEMS = [];
+    let activeMenu = 'dashboard';
+    let confirmCallback = null;
+    let isMobileMenuOpen = false;
+
+    let scene, camera, renderer, controls;
+    let containerBoxMesh = null;
+    let loadedCargoMeshes = [];
+
+    let chartVolume = null;
+    let chartWeight = null;
+
+    let LAST_PACKED_BOXES = [];
+    let LAST_OVERLOAD_CARGO = [];
+    let LAST_CONTAINER_SPEC = {};
+    let LAST_TOTALS = { usedVol: 0, maxVol: 1, usedWgt: 0, maxWgt: 1 };
+
+    const CONTAINER_SPECS = {
+      "20ft": { nama: "20 FT Standard", maxVol: 33.17, maxWgt: 21800, L_cm: 590, W_cm: 235, H_cm: 239 },
+      "40ft": { nama: "40 FT Standard", maxVol: 67.65, maxWgt: 26500, L_cm: 1203, W_cm: 235, H_cm: 239 },
+      "40hc": { nama: "40 FT High Cube", maxVol: 76.12, maxWgt: 26500, L_cm: 1203, W_cm: 235, H_cm: 269 }
+    };
+
+    const COLOR_PALETTE = [0x3b82f6, 0x10b981, 0xf59e0b, 0xef4444, 0x8b5cf6, 0xec4899, 0x14b8a6, 0x6366f1, 0xf97316, 0x06b6d4];
+    const COLOR_PALETTE_HEX = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#6366f1', '#f97316', '#06b6d4'];
+
+    function toggleMobileMenu() {
+      const drawer = document.getElementById('mobile-menu-drawer');
+      const icon = document.getElementById('mobile-menu-icon');
+      isMobileMenuOpen = !isMobileMenuOpen;
+      
+      if (isMobileMenuOpen) {
+        drawer.classList.remove('-translate-y-full', 'pointer-events-none');
+        icon.className = "fa-solid fa-xmark text-lg text-white";
+      } else {
+        drawer.classList.add('-translate-y-full', 'pointer-events-none');
+        icon.className = "fa-solid fa-bars text-lg";
+      }
+    }
+
+    function switchMobileMenu(menuId) {
+      closeMobileMenu();
+      switchMenu(menuId);
+    }
+
+    function closeMobileMenu() {
+      if (isMobileMenuOpen) toggleMobileMenu();
+    }
+
+    window.onload = function() {
+      loadSettings();
+      try {
+        init3DScene();
+      } catch (e) {
+        console.error("Gagal memuat visualisasi 3D:", e);
+      }
+      initUtilisationCharts();
+
+      document.getElementById('dbModeText').innerText = IS_PREVIEW ? "Preview (Lokal)" : "Cloud Sheets";
+      
+      if (IS_PREVIEW) {
+        refreshAllTablesAndIndicators();
+      } else {
+        fetchServerData();
+      }
+
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      document.getElementById('headerCurrentDate').innerText = new Date().toLocaleDateString('id-ID', options);
+    };
+
+    function loadSettings() {
+      const saved = localStorage.getItem('CARGO3D_BRANDING_SETTINGS');
+      if (saved) {
+        try { APP_SETTINGS = JSON.parse(saved); } catch (e) { console.error(e); }
+      }
+      applyBrandingSettings();
+      populateSettingsInputs();
+    }
+
+    function populateSettingsInputs() {
+      document.getElementById('set_appTitle').value = APP_SETTINGS.appTitle;
+      document.getElementById('set_appDesc').value = APP_SETTINGS.appDesc;
+      document.getElementById('set_createdBy').value = APP_SETTINGS.createdBy;
+      document.getElementById('set_trademark').value = APP_SETTINGS.trademark;
+      document.getElementById('set_logoUrl').value = APP_SETTINGS.logoUrl;
+      document.getElementById('set_themeColorHex').value = APP_SETTINGS.themeColor;
+      document.getElementById('set_themeColorPicker').value = APP_SETTINGS.themeColor;
+    }
+
+    function applyBrandingSettings() {
+      const base = APP_SETTINGS.themeColor;
+      document.documentElement.style.setProperty('--color-brand-50', adjustBrightness(base, 90));
+      document.documentElement.style.setProperty('--color-brand-100', adjustBrightness(base, 75));
+      document.documentElement.style.setProperty('--color-brand-500', base);
+      document.documentElement.style.setProperty('--color-brand-600', adjustBrightness(base, -15));
+      document.documentElement.style.setProperty('--color-brand-700', adjustBrightness(base, -30));
+
+      document.querySelectorAll('.dynamic-app-title').forEach(el => el.innerText = APP_SETTINGS.appTitle);
+      document.querySelectorAll('.dynamic-app-desc').forEach(el => el.innerText = APP_SETTINGS.appDesc);
+
+      document.querySelectorAll('.dynamic-app-logo').forEach(el => {
+        if (APP_SETTINGS.logoUrl && APP_SETTINGS.logoUrl.trim() !== "") {
+          el.innerHTML = `<img src="${APP_SETTINGS.logoUrl}" class="w-full h-full object-contain max-h-full max-w-full" alt="Logo">`;
+        } else {
+          el.innerHTML = `<i class="fa-solid fa-boxes-packing text-3xl text-white"></i>`;
+        }
+      });
+
+      document.querySelectorAll('.dynamic-sidebar-logo').forEach(el => {
+        if (APP_SETTINGS.logoUrl && APP_SETTINGS.logoUrl.trim() !== "") {
+          el.innerHTML = `<img src="${APP_SETTINGS.logoUrl}" class="w-full h-full object-contain max-h-full max-w-full" alt="Logo">`;
+        } else {
+          el.innerHTML = `<i class="fa-solid fa-truck-ramp-box text-lg"></i>`;
+        }
+      });
+
+      document.querySelectorAll('.dynamic-trademark').forEach(el => el.innerText = APP_SETTINGS.trademark);
+    }
+
+    function adjustBrightness(hex, percent) {
+      let R = parseInt(hex.substring(1, 3), 16);
+      let G = parseInt(hex.substring(3, 5), 16);
+      let B = parseInt(hex.substring(5, 7), 16);
+
+      R = parseInt(R + (percent * 2.55));
+      G = parseInt(G + (percent * 2.55));
+      B = parseInt(B + (percent * 2.55));
+
+      R = Math.min(Math.max(0, R), 255);
+      G = Math.min(Math.max(0, G), 255);
+      B = Math.min(Math.max(0, B), 255);
+
+      return `#${R.toString(16).padStart(2, '0')}${G.toString(16).padStart(2, '0')}${B.toString(16).padStart(2, '0')}`;
+    }
+
+    function handleLogoUpload(input) {
+      if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          APP_SETTINGS.logoUrl = e.target.result;
+          applyBrandingSettings();
+          showToast("Logo berhasil diunggah!", "success");
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    function handleLogoUrlInput(url) {
+      APP_SETTINGS.logoUrl = url;
+      applyBrandingSettings();
+    }
+
+    function applyPresetTheme(hexColor) {
+      document.getElementById('set_themeColorHex').value = hexColor;
+      document.getElementById('set_themeColorPicker').value = hexColor;
+      APP_SETTINGS.themeColor = hexColor;
+      applyBrandingSettings();
+      showToast("Tema warna berhasil diperbarui!", "success");
+    }
+
+    function applyCustomThemeColor(hexColor) {
+      if (/^#[0-9A-F]{6}$/i.test(hexColor)) {
+        document.getElementById('set_themeColorHex').value = hexColor;
+        document.getElementById('set_themeColorPicker').value = hexColor;
+        APP_SETTINGS.themeColor = hexColor;
+        applyBrandingSettings();
+      }
+    }
+
+    function showToast(message, type = "success") {
+      const container = document.getElementById('notificationArea');
+      const toast = document.createElement('div');
+      
+      let colors = "bg-emerald-500 text-white border-emerald-600";
+      let icon = "fa-circle-check";
+      if (type === "warning") {
+        colors = "bg-amber-500 text-white border-amber-600";
+        icon = "fa-triangle-exclamation";
+      } else if (type === "danger") {
+        colors = "bg-red-500 text-white border-red-600";
+        icon = "fa-circle-xmark";
+      }
+
+      toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl border shadow-lg ${colors} font-semibold text-xs pointer-events-auto transition duration-300 transform translate-y-2 opacity-0`;
+      toast.innerHTML = `<i class="fa-solid ${icon} text-sm"></i> <span>${message}</span>`;
+      
+      container.appendChild(toast);
+      setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 50);
+      setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => { toast.remove(); }, 300);
+      }, 3500);
+    }
+
+    function showModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+      }
+    }
+
+    function hideModal(id) {
+      const modal = document.getElementById(id);
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+      }
+    }
+
+    function setLoader(show, text = "Memproses Data...", showProgress = false) {
+      const loader = document.getElementById('loadingOverlay');
+      const label = document.getElementById('loadingText');
+      const progressContainer = document.getElementById('progressContainer');
+      const progressText = document.getElementById('progressText');
+
+      if (loader) {
+        if (show) {
+          if (label) label.innerText = text;
+          loader.classList.remove('hidden');
+          if (showProgress) {
+            if (progressContainer) progressContainer.classList.remove('hidden');
+            if (progressText) progressText.classList.remove('hidden');
+          } else {
+            if (progressContainer) progressContainer.classList.add('hidden');
+            if (progressText) progressText.classList.add('hidden');
+          }
+        } else {
+          loader.classList.add('hidden');
+        }
+      }
+    }
+
+    // --- FUNGSI TAMENK BARU: VALIDASI IZIN DATABASE CLOUD YANG AMAN ---
+    function hasPermission(user, menuId) {
+      if (!user) return false;
+      if (user.role === 'Admin') return true;
+      if (!user.allowedMenus) return false;
+      
+      let menus = user.allowedMenus;
+      if (typeof menus === 'string') {
+        try {
+          const parsed = JSON.parse(menus);
+          if (Array.isArray(parsed)) {
+            menus = parsed;
+          } else {
+            menus = menus.split(',').map(s => s.trim());
+          }
+        } catch (e) {
+          menus = menus.split(',').map(s => s.trim());
+        }
+      }
+      if (Array.isArray(menus)) {
+        return menus.includes(menuId);
+      }
+      return false;
+    }
+
+    // --- PERBAIKAN UTAMA: SISTEM KONEKSI CLOUD LOG MASUK AMAN CORS & REDIREKSI ---
+    function handleLoginSubmit() {
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value;
+
+      if (!user || !pass) {
+        showToast("Username dan password tidak boleh kosong!", "warning");
+        return;
+      }
+
+      setLoader(true, "Memverifikasi Kredensial...");
+
+      if (IS_PREVIEW) {
+        const match = DB_USERS.find(u => u.username.toLowerCase() === user.toLowerCase() && u.password === pass);
+        if (match) {
+          completeLogin(match);
+        } else {
+          setLoader(false);
+          showToast("Username atau password salah!", "danger");
+        }
+      } else {
+        // Melakukan validasi proteksi placeholder URL
+        if (GAS_URL.includes("AKfycbyI8u_b7eD0bK7QY4E08Lgho0q4Z6qC626qE-GAS-URL-ANDA")) {
+          setLoader(false);
+          showToast("Koneksi gagal: Anda belum mengganti URL GAS_URL di baris 63 dengan URL Web App Anda sendiri!", "danger");
+          return;
+        }
+
+        // Untuk login, gunakan GET yang bersih, tambahkan timestamp pencegah cache browser
+        const targetUrl = `${GAS_URL}?action=login&username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&_t=${Date.now()}`;
+        
+        fetch(targetUrl, {
+          method: 'GET',
+          redirect: 'follow'
+        })
+          .then(res => {
+            if (!res.ok) throw new Error("Server HTTP mengembalikan status " + res.status);
+            return res.json();
+          })
+          .then(data => {
+            if (data.status === "success") {
+              completeLogin(data.user);
+            } else {
+              setLoader(false);
+              showToast(data.message || "Gagal login. Periksa kredensial kembali.", "danger");
+            }
+          })
+          .catch(err => {
+            console.error("Kesalahan jaringan login:", err);
+            setLoader(false);
+            showToast("Gagal berkomunikasi dengan server GAS. Sistem dialihkan ke mode demo.", "warning");
+            
+            // Fallback ke login lokal jika koneksi server mati/gagal
+            const match = DB_USERS.find(u => u.username.toLowerCase() === user.toLowerCase() && u.password === pass);
+            if (match) {
+              completeLogin(match);
+            }
+          });
+      }
+    }
+
+    function completeLogin(userObj) {
+      CURRENT_USER = userObj;
+      setLoader(false);
+
+      document.getElementById('userBarName').innerText = userObj.nama;
+      document.getElementById('userBarRole').innerText = userObj.role;
+      document.getElementById('mobileUserBarName').innerText = userObj.nama;
+
+      applySidebarMenuPermissions(userObj);
+
+      document.getElementById('loginView').classList.add('hidden');
+      document.getElementById('blogger-web-app-container').classList.remove('hidden');
+
+      showToast(`Selamat datang kembali, ${userObj.nama}!`, "success");
+      switchMenu('dashboard');
+    }
+
+    function applySidebarMenuPermissions(userObj) {
+      const isUserAdmin = userObj.role === "Admin";
+      
+      document.querySelectorAll('.admin-only').forEach(el => {
+        if (isUserAdmin) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+      });
+
+      const permissionsMap = {
+        "calculator": ["btn-menu-calculator", "mob-menu-calculator"],
+        "report": ["btn-menu-report", "mob-menu-report"],
+        "master": ["btn-menu-master", "mob-menu-master"],
+        "history": ["btn-menu-history", "mob-menu-history"],
+        "settings": ["btn-menu-settings", "mob-menu-settings"]
+      };
+
+      for (const [key, elementIds] of Object.entries(permissionsMap)) {
+        elementIds.forEach(id => {
+          const btn = document.getElementById(id);
+          if (!btn) return;
+
+          btn.classList.remove('opacity-40', 'cursor-not-allowed', 'pointer-events-none');
+          if (id.startsWith('mob-')) {
+            btn.setAttribute('onclick', `switchMobileMenu('${key}')`);
+          } else {
+            btn.setAttribute('onclick', `switchMenu('${key}')`);
+          }
+          
+          if (!isUserAdmin) {
+            const userAllowed = hasPermission(userObj, key);
+            if (!userAllowed) {
+              btn.classList.add('opacity-40', 'cursor-not-allowed');
+              btn.removeAttribute('onclick');
+            }
+          }
+        });
+      }
+    }
+
+    function handleLogout() {
+      CURRENT_USER = null;
+      closeMobileMenu();
+      document.getElementById('blogger-web-app-container').classList.add('hidden');
+      document.getElementById('loginView').classList.remove('hidden');
+      showToast("Berhasil logout dari sistem kargo.", "success");
+    }
+
+    function switchMenu(menuId) {
+      if (CURRENT_USER && CURRENT_USER.role !== 'Admin') {
+        const isAllowed = hasPermission(CURRENT_USER, menuId);
+        if (menuId !== 'dashboard' && !isAllowed) {
+          showToast("Akses Ditolak: Anda tidak memiliki izin untuk membuka menu ini.", "danger");
+          return;
+        }
+      }
+
+      activeMenu = menuId;
+      const sections = ['dashboard', 'calculator', 'master', 'history', 'users', 'report', 'settings'];
+      sections.forEach(sec => {
+        const el = document.getElementById(`section-${sec}`);
+        const btn = document.getElementById(`btn-menu-${sec}`);
+        const mobBtn = document.getElementById(`mob-menu-${sec}`);
+        
+        if (sec === menuId) {
+          if (el) el.classList.remove('hidden');
+          if (btn) btn.className = "flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-semibold text-white bg-white/5 shadow-[inset_3px_0_0_0_var(--color-brand-500)]";
+          if (mobBtn) mobBtn.className = "flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-white bg-white/5 shadow-[inset_3px_0_0_0_var(--color-brand-500)]";
+        } else {
+          if (el) el.classList.add('hidden');
+          if (btn) {
+            const isMenuAllowed = CURRENT_USER && (CURRENT_USER.role === "Admin" || hasPermission(CURRENT_USER, sec));
+            const disabledClass = !isMenuAllowed && sec !== 'users' ? 'opacity-40 cursor-not-allowed' : '';
+            btn.className = `flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white ${disabledClass}`;
+          }
+          if (mobBtn) {
+            const isMenuAllowed = CURRENT_USER && (CURRENT_USER.role === "Admin" || hasPermission(CURRENT_USER, sec));
+            const disabledClass = !isMenuAllowed && sec !== 'users' ? 'opacity-40 cursor-not-allowed' : '';
+            mobBtn.className = `flex items-center gap-3 px-4 py-2.5 rounded-md transition text-xs font-bold text-slate-400 hover:bg-white/5 hover:text-white ${disabledClass}`;
+          }
+        }
+      });
+
+      let title = "Dashboard Ringkasan";
+      if (menuId === "calculator") {
+        title = "Kalkulator & Simulasi Kargo 3D";
+        setTimeout(() => {
+          onWindowResize();
+          executeSimulationEngine();
+        }, 150);
+      } else if (menuId === "report") {
+        title = "Laporan Spasial & Preview 2D";
+        renderReportPage();
+      } else if (menuId === "master") {
+        title = "Database Master Kargo";
+      } else if (menuId === "history") {
+        title = "Riwayat Kalkulasi Muat";
+      } else if (menuId === "users") {
+        title = "Manajemen Akun Operator";
+      } else if (menuId === "settings") {
+        title = "Pengaturan Platform & Warna";
+      }
+      document.getElementById('mainPageTitle').innerText = title;
+    }
+
+    // --- PERBAIKAN SINKRONISASI AWAN: CETAK DETAIL DIAGNOSTIK KE TOAST JIKA TIMEOUT / ERROR ---
+    function fetchServerData() {
+      if (IS_PREVIEW) return;
+      
+      if (GAS_URL.includes("AKfycbyI8u_b7eD0bK7QY4E08Lgho0q4Z6qC626qE-GAS-URL-ANDA")) {
+        showToast("Sinkronisasi gagal: Isikan URL GAS Anda terlebih dahulu di baris 63!", "danger");
+        return;
+      }
+
+      setLoader(true, "Menyinkronkan Basis Data Cloud...");
+
+      fetch(`${GAS_URL}?action=getAllData&_t=${Date.now()}`, {
+        method: 'GET',
+        redirect: 'follow'
+      })
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP Status " + res.status);
+          return res.json();
+        })
+        .then(data => {
+          setLoader(false);
+          if (data.status === "success" || data.users) {
+            if (data.cargo_master) DB_CARGO_MASTER = data.cargo_master;
+            if (data.users) DB_USERS = data.users;
+            if (data.riwayat) DB_RIWAYAT = data.riwayat;
+            
+            refreshAllTablesAndIndicators();
+            showToast("Database Google Sheets sukses disinkronkan!", "success");
+          }
+        })
+        .catch(err => {
+          console.error("Kesalahan sinkronisasi data cloud:", err);
+          setLoader(false);
+          showToast("Gagal sinkron cloud. Silakan periksa deployment GAS dan izin hak akses ('Anyone').", "warning");
+          refreshAllTablesAndIndicators();
+        });
+    }
+
+    // --- PERBAIKAN POST PAYLOAD: KIRIM PARAMETER ACTION DI DALAM BODY SEBAGAI PLAIN TEXT ---
+    // Cara ini 100% menghapus error CORS Preflight (OPTIONS Request) pada Google Apps Script
+    function callServerAPI(action, payload, callback) {
+      setLoader(true, "Menghubungi Cloud Server...");
+
+      if (GAS_URL.includes("AKfycbyI8u_b7eD0bK7QY4E08Lgho0q4Z6qC626qE-GAS-URL-ANDA")) {
+        setLoader(false);
+        showToast("Gagal: URL Google Apps Script Anda belum diisi!", "danger");
+        return;
+      }
+
+      // Gabungkan data muatan dengan string instruksi action pelat peladen
+      const safePayload = {
+        action: action,
+        ...payload
+      };
+
+      fetch(`${GAS_URL}?action=${action}`, {
+        method: 'POST',
+        // Menggunakan text/plain adalah SATU-SATUNYA cara aman melewati pembatasan CORS OPTIONS di GAS
+        headers: { 
+          'Content-Type': 'text/plain;charset=utf-8' 
+        },
+        redirect: 'follow',
+        body: JSON.stringify(safePayload)
+      })
+      .then(res => {
+        if (!res.ok) throw new Error("Peladen mengembalikan status HTTP " + res.status);
+        return res.json();
+      })
+      .then(response => {
+        setLoader(false);
+        if (response.status === "success") {
+          if (callback) callback(response);
+        } else {
+          showToast(response.message || "Aksi database gagal dilakukan.", "danger");
+        }
+      })
+      .catch(err => {
+        console.error("Kegagalan API POST GAS:", err);
+        setLoader(false);
+        showToast("Error Koneksi Cloud: Pastikan setelan Deploy Anda adalah 'Anyone' dan simpan perubahan.", "danger");
+      });
+    }
+
+    function refreshAllTablesAndIndicators() {
+      renderMasterCargoTable();
+      renderUserTable();
+      renderHistoryTable();
+      populateMasterDropdown();
+
+      document.getElementById('statMasterCount').innerText = DB_CARGO_MASTER.length;
+      document.getElementById('statHistoryCount').innerText = DB_RIWAYAT.length;
+      document.getElementById('statUsersCount').innerText = DB_USERS.length;
+    }
+
+    function openConfirmDelete(msg, callback) {
+      document.getElementById('confirmMessage').innerText = msg;
+      showModal('customConfirmModal');
+      confirmCallback = callback;
+    }
+
+    function closeConfirmModal(accepted) {
+      hideModal('customConfirmModal');
+      if (accepted && confirmCallback) confirmCallback();
+      confirmCallback = null;
+    }
+
+    function renderMasterCargoTable() {
+      const tbody = document.getElementById('masterCargoTableBody');
+      tbody.innerHTML = "";
+
+      if (DB_CARGO_MASTER.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 italic">Database Master Barang kosong. Silakan tambah kargo baru.</td></tr>`;
+        return;
+      }
+
+      DB_CARGO_MASTER.forEach(item => {
+        const length = parseFloat(item.panjang_cm) || 0;
+        const width = parseFloat(item.lebar_cm) || 0;
+        const height = parseFloat(item.tinggi_cm) || 0;
+        const weight = parseFloat(item.berat_kg) || 0;
+        
+        const vol = (length * width * height) / 1000000;
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold text-slate-800">${escapeHTML(item.nama_barang)}</td>
+          <td class="py-3 px-4 text-center">${length}</td>
+          <td class="py-3 px-4 text-center">${width}</td>
+          <td class="py-3 px-4 text-center">${height}</td>
+          <td class="py-3 px-4 text-center">${weight}</td>
+          <td class="py-3 px-4 text-center font-semibold text-brand-600">${vol.toFixed(4)}</td>
+          <td class="py-3 px-4 text-right space-x-1.5 shrink-0">
+            <button onclick="openMasterCargoModal('${item.id}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded-lg transition"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteMasterCargo('${item.id}')" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg transition"><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateMasterDropdown() {
+      const dropdown = document.getElementById('cargo_selector');
+      dropdown.innerHTML = `<option value="">-- Pilih Barang di Sini --</option>`;
+      DB_CARGO_MASTER.forEach(item => {
+        dropdown.innerHTML += `<option value="${item.id}">${escapeHTML(item.nama_barang)} [${item.panjang_cm}x${item.lebar_cm}x${item.tinggi_cm} cm | ${item.berat_kg} kg]</option>`;
+      });
+    }
+
+    function handleDropdownCargoSelect() {
+      const id = document.getElementById('cargo_selector').value;
+      if (!id) {
+        document.getElementById('inputQty').value = "";
+        document.getElementById('inputWeightAuto').value = "";
+        return;
+      }
+      const item = DB_CARGO_MASTER.find(c => c.id === id);
+      if (item) {
+        document.getElementById('inputQty').value = 1;
+        document.getElementById('inputWeightAuto').value = item.berat_kg;
+      }
+    }
+
+    document.getElementById('inputQty')?.addEventListener('input', function() {
+      const qty = parseInt(this.value) || 0;
+      const id = document.getElementById('cargo_selector').value;
+      if (id) {
+        const item = DB_CARGO_MASTER.find(c => c.id === id);
+        if (item) {
+          document.getElementById('inputWeightAuto').value = (item.berat_kg * qty).toFixed(1);
+        }
+      }
+    });
+
+    function openMasterCargoModal(id = null) {
+      showModal('modalMasterCargo');
+      if (id) {
+        document.getElementById('masterCargoModalTitle').innerText = "Edit Master Barang";
+        const item = DB_CARGO_MASTER.find(c => c.id === id);
+        if (item) {
+          document.getElementById('masterCargoId').value = item.id;
+          document.getElementById('masterCargoName').value = item.nama_barang;
+          document.getElementById('masterCargoLength').value = item.panjang_cm;
+          document.getElementById('masterCargoWidth').value = item.lebar_cm;
+          document.getElementById('masterCargoHeight').value = item.tinggi_cm;
+          document.getElementById('masterCargoWeight').value = item.berat_kg;
+        }
+      } else {
+        document.getElementById('masterCargoModalTitle').innerText = "Tambah Master Barang Baru";
+        document.getElementById('masterCargoId').value = "";
+        document.getElementById('masterCargoName').value = "";
+        document.getElementById('masterCargoLength').value = "";
+        document.getElementById('masterCargoWidth').value = "";
+        document.getElementById('masterCargoHeight').value = "";
+        document.getElementById('masterCargoWeight').value = "";
+      }
+    }
+
+    function closeMasterCargoModal() {
+      hideModal('modalMasterCargo');
+    }
+
+    function saveMasterCargo() {
+      const id = document.getElementById('masterCargoId').value;
+      const name = document.getElementById('masterCargoName').value.trim();
+      const len = parseFloat(document.getElementById('masterCargoLength').value);
+      const wid = parseFloat(document.getElementById('masterCargoWidth').value);
+      const hgt = parseFloat(document.getElementById('masterCargoHeight').value);
+      const wgt = parseFloat(document.getElementById('masterCargoWeight').value) || 0;
+
+      if (!name || isNaN(len) || isNaN(wid) || isNaN(hgt)) {
+        showToast("Tolong isi parameter master barang dengan lengkap!", "warning");
+        return;
+      }
+
+      const payload = { id, nama_barang: name, panjang_cm: len, lebar_cm: wid, tinggi_cm: hgt, berat_kg: wgt };
+
+      if (IS_PREVIEW) {
+        if (id && id.trim() !== "") {
+          const idx = DB_CARGO_MASTER.findIndex(c => c.id === id);
+          if (idx !== -1) DB_CARGO_MASTER[idx] = payload;
+          showToast("Master kargo berhasil diubah (Lokal)!", "success");
+        } else {
+          payload.id = "crg-" + Date.now();
+          DB_CARGO_MASTER.push(payload);
+          showToast("Master kargo berhasil ditambahkan (Lokal)!", "success");
+        }
+        refreshAllTablesAndIndicators();
+        closeMasterCargoModal();
+      } else {
+        callServerAPI(id ? "editMasterCargo" : "addMasterCargo", payload, () => {
+          showToast("Database Master Kargo sukses disinkronkan!", "success");
+          fetchServerData();
+          closeMasterCargoModal();
+        });
+      }
+    }
+
+    function deleteMasterCargo(id) {
+      openConfirmDelete("Apakah Anda yakin ingin menghapus item kargo ini dari master database?", () => {
+        if (IS_PREVIEW) {
+          DB_CARGO_MASTER = DB_CARGO_MASTER.filter(c => c.id !== id);
+          showToast("Master kargo berhasil dihapus (Lokal)!", "success");
+          refreshAllTablesAndIndicators();
+        } else {
+          callServerAPI("deleteMasterCargo", { id }, () => {
+            showToast("Sukses menghapus master kargo!", "success");
+            fetchServerData();
+          });
+        }
+      });
+    }
+
+    function renderUserTable() {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = "";
+
+      DB_USERS.forEach(user => {
+        const isSelf = CURRENT_USER && CURRENT_USER.id === user.id;
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        
+        // --- PROSES DESENTRALISASI LOGIKA JOIN UNTUK CLOUD COMPATIBILITY ---
+        let permsLabel = 'Tidak ada akses';
+        if (user.role === 'Admin') {
+          permsLabel = 'Semua Akses';
+        } else if (user.allowedMenus) {
+          if (Array.isArray(user.allowedMenus)) {
+            permsLabel = user.allowedMenus.join(', ');
+          } else if (typeof user.allowedMenus === 'string') {
+            try {
+              const parsed = JSON.parse(user.allowedMenus);
+              permsLabel = Array.isArray(parsed) ? parsed.join(', ') : user.allowedMenus;
+            } catch (e) {
+              permsLabel = user.allowedMenus; // fallback string biasa dipisah koma
+            }
+          }
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold text-slate-800">
+            ${escapeHTML(user.nama)} ${isSelf ? '<span class="text-[9px] bg-brand-50 px-1.5 py-0.5 rounded text-brand-600 font-bold ml-1">Saya</span>':''}
+          </td>
+          <td class="py-3 px-4 text-slate-600">${escapeHTML(user.username)}</td>
+          <td class="py-3 px-4 text-slate-400 font-mono text-[11px]">${escapeHTML(user.password)}</td>
+          <td class="py-3 px-4 text-center">
+            <span class="px-2.5 py-0.5 text-[10px] font-bold rounded-full ${user.role === 'Admin' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}">${user.role}</span>
+            <div class="text-[9px] text-slate-400 mt-1 truncate max-w-[150px]" title="${permsLabel}">${permsLabel}</div>
+          </td>
+          <td class="py-3 px-4 text-right space-x-1">
+            <button onclick="openUserModal('${user.id}')" class="text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded-lg transition"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteUser('${user.id}')" ${isSelf ? 'disabled class="opacity-30 cursor-not-allowed p-1.5"' : 'class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-lg transition"'}><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function togglePermissionsArea(role) {
+      const area = document.getElementById('permissionsArea');
+      if (role === "Admin") area.classList.add('hidden');
+      else area.classList.remove('hidden');
+    }
+
+    function openUserModal(id = null) {
+      showModal('modalUser');
+      if (id) {
+        document.getElementById('userModalTitle').innerText = "Edit Akun Pengguna";
+        const u = DB_USERS.find(user => user.id === id);
+        if (u) {
+          document.getElementById('userId').value = u.id;
+          document.getElementById('userFullName').value = u.nama;
+          document.getElementById('userUsername').value = u.username;
+          document.getElementById('userPassword').value = u.password;
+          document.getElementById('userRole').value = u.role;
+          
+          togglePermissionsArea(u.role);
+          
+          // --- PENYELARASAN PROPERTI ALLOWED MENUS SAAT MEMBUKA MODAL EDIT ---
+          const menus = u.allowedMenus || [];
+          let menusArray = [];
+          if (Array.isArray(menus)) {
+            menusArray = menus;
+          } else if (typeof menus === 'string') {
+            try {
+              const parsed = JSON.parse(menus);
+              menusArray = Array.isArray(parsed) ? parsed : menus.split(',').map(s => s.trim());
+            } catch (e) {
+              menusArray = menus.split(',').map(s => s.trim());
+            }
+          }
+
+          document.getElementById('perm_calculator').checked = menusArray.includes('calculator');
+          document.getElementById('perm_report').checked = menusArray.includes('report');
+          document.getElementById('perm_master').checked = menusArray.includes('master');
+          document.getElementById('perm_history').checked = menusArray.includes('history');
+          document.getElementById('perm_settings').checked = menusArray.includes('settings');
+        }
+      } else {
+        document.getElementById('userModalTitle').innerText = "Tambah Akun Pengguna Baru";
+        document.getElementById('userId').value = "";
+        document.getElementById('userFullName').value = "";
+        document.getElementById('userUsername').value = "";
+        document.getElementById('userPassword').value = "";
+        document.getElementById('userRole').value = "Operator";
+        togglePermissionsArea("Operator");
+        document.getElementById('perm_calculator').checked = true;
+        document.getElementById('perm_report').checked = true;
+        document.getElementById('perm_master').checked = true;
+        document.getElementById('perm_history').checked = true;
+        document.getElementById('perm_settings').checked = true;
+      }
+    }
+
+    function closeUserModal() {
+      hideModal('modalUser');
+    }
+
+    function saveUser() {
+      const id = document.getElementById('userId').value;
+      const name = document.getElementById('userFullName').value.trim();
+      const username = document.getElementById('userUsername').value.trim();
+      const pass = document.getElementById('userPassword').value;
+      const role = document.getElementById('userRole').value;
+
+      if (!name || !username || !pass) {
+        showToast("Isi seluruh input kolom akun dengan lengkap!", "warning");
+        return;
+      }
+
+      const allowedMenus = [];
+      if (role === "Admin") {
+        allowedMenus.push("calculator", "report", "master", "history", "settings");
+      } else {
+        if (document.getElementById('perm_calculator').checked) allowedMenus.push("calculator");
+        if (document.getElementById('perm_report').checked) allowedMenus.push("report");
+        if (document.getElementById('perm_master').checked) allowedMenus.push("master");
+        if (document.getElementById('perm_history').checked) allowedMenus.push("history");
+        if (document.getElementById('perm_settings').checked) allowedMenus.push("settings");
+      }
+
+      const payload = { id, nama: name, username, password: pass, role, allowedMenus };
+
+      if (IS_PREVIEW) {
+        if (id && id.trim() !== "") {
+          const idx = DB_USERS.findIndex(u => u.id === id);
+          if (idx !== -1) DB_USERS[idx] = payload;
+          showToast("Operator berhasil diubah (Lokal)!", "success");
+        } else {
+          payload.id = "usr-" + Date.now();
+          DB_USERS.push(payload);
+          showToast("Operator baru berhasil ditambahkan (Lokal)!", "success");
+        }
+        if (CURRENT_USER && CURRENT_USER.id === payload.id) {
+          CURRENT_USER = payload;
+          applySidebarMenuPermissions(payload);
+        }
+        refreshAllTablesAndIndicators();
+        closeUserModal();
+      } else {
+        callServerAPI(id ? "editUser" : "addUser", payload, () => {
+          showToast("Data akun berhasil diproses!", "success");
+          fetchServerData();
+          closeUserModal();
+        });
+      }
+    }
+
+    function deleteUser(id) {
+      openConfirmDelete("Yakin ingin menghapus akses operator ini?", () => {
+        if (IS_PREVIEW) {
+          DB_USERS = DB_USERS.filter(u => u.id !== id);
+          showToast("User dihapus (Lokal)!", "success");
+          refreshAllTablesAndIndicators();
+        } else {
+          callServerAPI("deleteUser", { id }, () => {
+            showToast("Sukses menghapus pengguna!", "success");
+            fetchServerData();
+          });
+        }
+      });
+    }
+
+    function renderLoadedCargoTable() {
+      const tbody = document.getElementById('loadedCargoTableBody');
+      tbody.innerHTML = "";
+      document.getElementById('cargoListBadge').innerText = SELECTED_CARGO_ITEMS.length;
+
+      if (SELECTED_CARGO_ITEMS.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-400 italic">Belum ada barang dimasukkan ke list muat.</td></tr>`;
+        return;
+      }
+
+      SELECTED_CARGO_ITEMS.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${escapeHTML(item.nama_barang)}</td>
+          <td class="py-2.5 px-2 text-center font-mono">${item.panjang_cm}x${item.lebar_cm}x${item.tinggi_cm}</td>
+          <td class="py-2.5 px-2 text-center font-bold text-brand-600">${item.qty} Pcs</td>
+          <td class="py-2.5 px-2 text-center">${(item.berat_kg * item.qty).toFixed(1)}</td>
+          <td class="py-2.5 px-3 text-right">
+            <button onclick="removeSelectedCargoFromList(${index})" class="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1 rounded-lg transition"><i class="fa-solid fa-xmark"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addSelectedCargoToList() {
+      const id = document.getElementById('cargo_selector').value;
+      const qty = parseInt(document.getElementById('inputQty').value) || 0;
+
+      if (!id) {
+        showToast("Tolong pilih jenis kargo dari database terlebih dahulu!", "warning");
+        return;
+      }
+      if (qty <= 0) {
+        showToast("Tentukan jumlah unit yang valid!", "warning");
+        return;
+      }
+
+      const master = DB_CARGO_MASTER.find(c => c.id === id);
+      if (master) {
+        const exists = SELECTED_CARGO_ITEMS.find(c => c.id === master.id);
+        if (exists) {
+          exists.qty += qty;
+        } else {
+          SELECTED_CARGO_ITEMS.push({
+            id: master.id,
+            nama_barang: master.nama_barang,
+            panjang_cm: parseFloat(master.panjang_cm),
+            lebar_cm: parseFloat(master.lebar_cm),
+            tinggi_cm: parseFloat(master.tinggi_cm),
+            berat_kg: parseFloat(master.berat_kg),
+            qty: qty
+          });
+        }
+        
+        showToast("Barang ditambahkan ke daftar kalkulator!", "success");
+        renderLoadedCargoTable();
+        document.getElementById('cargo_selector').value = "";
+        document.getElementById('inputQty').value = "";
+        document.getElementById('inputWeightAuto').value = "";
+      }
+    }
+
+    function clearAllSelectedCargo() {
+      SELECTED_CARGO_ITEMS = [];
+      renderLoadedCargoTable();
+      showToast("List kalkulasi dibersihkan.", "success");
+      runSimulationCalculation();
+    }
+
+    function removeSelectedCargoFromList(index) {
+      SELECTED_CARGO_ITEMS.splice(index, 1);
+      renderLoadedCargoTable();
+      showToast("Kargo dihapus dari list kalkulasi.", "success");
+      runSimulationCalculation();
+    }
+
+    function openAddCargoModal() {
+      showModal('modalAddCargo');
+      document.getElementById('customCargoName').value = "";
+      document.getElementById('customCargoLength').value = "";
+      document.getElementById('customCargoWidth').value = "";
+      document.getElementById('customCargoHeight').value = "";
+      document.getElementById('customCargoWeight').value = "";
+    }
+
+    function closeAddCargoModal() {
+      hideModal('modalAddCargo');
+    }
+
+    function submitCustomCargo() {
+      const name = document.getElementById('customCargoName').value.trim();
+      const len = parseFloat(document.getElementById('customCargoLength').value);
+      const wid = parseFloat(document.getElementById('customCargoWidth').value);
+      const hgt = parseFloat(document.getElementById('customCargoHeight').value);
+      const wgt = parseFloat(document.getElementById('customCargoWeight').value) || 0;
+
+      if (!name || isNaN(len) || isNaN(wid) || isNaN(hgt)) {
+        showToast("Parameter kargo kustom tidak lengkap!", "warning");
+        return;
+      }
+
+      const tempId = "crg-custom-" + Date.now();
+      const payload = { id: tempId, nama_barang: "[KUSTOM] " + name, panjang_cm: len, lebar_cm: wid, tinggi_cm: hgt, berat_kg: wgt };
+
+      DB_CARGO_MASTER.push(payload);
+      refreshAllTablesAndIndicators();
+
+      document.getElementById('cargo_selector').value = tempId;
+      document.getElementById('inputQty').value = 1;
+      document.getElementById('inputWeightAuto').value = wgt;
+
+      closeAddCargoModal();
+      showToast("Barang kustom ditambahkan ke opsi selektor!", "success");
+    }
+
+    function initUtilisationCharts() {
+      const volCtx = document.getElementById('chartVolumeRing').getContext('2d');
+      chartVolume = new Chart(volCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Terpakai', 'Sisa Kosong'],
+          datasets: [{
+            data: [0, 100],
+            backgroundColor: ['#2563eb', '#f1f5f9'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          cutout: '75%',
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      const wgtCtx = document.getElementById('chartWeightRing').getContext('2d');
+      chartWeight = new Chart(wgtCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Terpakai', 'Sisa Kosong'],
+          datasets: [{
+            data: [0, 100],
+            backgroundColor: ['#10b981', '#f1f5f9'],
+            borderWidth: 0
+          }]
+        },
+        options: {
+          cutout: '75%',
+          responsive: true,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function updateUtilisationGauges(usedVol, maxVol, usedWgt, maxWgt) {
+      const volPercent = Math.min((usedVol / maxVol) * 100, 100);
+      const wgtPercent = Math.min((usedWgt / maxWgt) * 100, 100);
+
+      const remVol = Math.max(maxVol - usedVol, 0);
+      const remVolPercent = Math.max(100 - volPercent, 0);
+      const remWgt = Math.max(maxWgt - usedWgt, 0);
+      const remWgtPercent = Math.max(100 - wgtPercent, 0);
+
+      document.getElementById('volUsePercent').innerText = volPercent.toFixed(2) + "%";
+      document.getElementById('volUsedText').innerText = usedVol.toFixed(2) + " m³";
+      document.getElementById('volRemainingText').innerText = `${remVol.toFixed(2)} m³ (${remVolPercent.toFixed(2)}%)`;
+
+      document.getElementById('wgtUsePercent').innerText = wgtPercent.toFixed(2) + "%";
+      document.getElementById('wgtUsedText').innerText = usedWgt.toFixed(1) + " kg";
+      document.getElementById('wgtRemainingText').innerText = `${remWgt.toFixed(1)} kg (${remWgtPercent.toFixed(2)}%)`;
+
+      document.getElementById('volRemainingText').className = (usedVol > maxVol) ? "text-red-500 font-bold" : "text-emerald-600 font-semibold";
+      document.getElementById('wgtRemainingText').className = (usedWgt > maxWgt) ? "text-red-500 font-bold animate-pulse" : "text-emerald-600 font-semibold";
+
+      if (chartVolume) {
+        chartVolume.data.datasets[0].data = [volPercent, 100 - volPercent];
+        chartVolume.data.datasets[0].backgroundColor = [usedVol > maxVol ? '#ef4444' : '#2563eb', '#f1f5f9'];
+        chartVolume.update();
+      }
+
+      if (chartWeight) {
+        chartWeight.data.datasets[0].data = [wgtPercent, 100 - wgtPercent];
+        chartWeight.data.datasets[0].backgroundColor = [usedWgt > maxWgt ? '#ef4444' : '#10b981', '#f1f5f9'];
+        chartWeight.update();
+      }
+    }
+
+    function init3DScene() {
+      const parent = document.getElementById('canvas3dContainer');
+      const width = parent.clientWidth;
+      const height = parent.clientHeight;
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x020617);
+
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+      camera.position.set(12, 8, 15);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(width, height);
+      renderer.shadowMap.enabled = true;
+      parent.appendChild(renderer.domElement);
+
+      if (typeof THREE.OrbitControls !== 'undefined') {
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+      } else if (typeof OrbitControls !== 'undefined') {
+        controls = new OrbitControls(camera, renderer.domElement);
+      }
+      
+      if (controls) {
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+      }
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+      dirLight.position.set(15, 20, 10);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      const gridHelper = new THREE.GridHelper(40, 40, 0x1e293b, 0x0f172a);
+      gridHelper.position.y = -0.01;
+      scene.add(gridHelper);
+
+      animate3D();
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+      const parent = document.getElementById('canvas3dContainer');
+      if (!parent || !camera || !renderer) return;
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (controls) controls.update();
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    function updateContainerSelection() {
+      runSimulationCalculation();
+    }
+
+    function intersect3D(b1, b2) {
+      return (
+        b1.x1 < b2.x2 && b1.x2 > b2.x1 &&
+        b1.y1 < b2.y2 && b1.y2 > b2.y1 &&
+        b1.z1 < b2.z2 && b1.z2 > b2.z1
+      );
+    }
+
+    function runSimulationCalculation() {
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+      
+      progressBar.style.width = '0%';
+      progressText.innerText = '0%';
+      setLoader(true, "Menganalisis Kerapatan Spasial...", true);
+
+      let currentPercent = 0;
+      const simInterval = setInterval(() => {
+        currentPercent += Math.floor(Math.random() * 15) + 10;
+        if (currentPercent >= 100) {
+          currentPercent = 100;
+          clearInterval(simInterval);
+          progressBar.style.width = '100%';
+          progressText.innerText = '100%';
+          
+          setTimeout(() => {
+            setLoader(false);
+            executeSimulationEngine();
+          }, 300);
+        } else {
+          progressBar.style.width = currentPercent + '%';
+          progressText.innerText = currentPercent + '%';
+        }
+      }, 100);
+    }
+
+    function executeSimulationEngine() {
+      if (!scene) return;
+      document.getElementById('loading3DIndicator').classList.remove('hidden');
+
+      loadedCargoMeshes.forEach(mesh => scene.remove(mesh));
+      loadedCargoMeshes = [];
+
+      if (containerBoxMesh) {
+        scene.remove(containerBoxMesh);
+        containerBoxMesh = null;
+      }
+
+      const containerType = document.getElementById('container_type').value;
+      const specs = CONTAINER_SPECS[containerType];
+      LAST_CONTAINER_SPEC = specs;
+
+      const scale = 0.01; 
+      const cLength = specs.L_cm * scale;
+      const cWidth = specs.W_cm * scale;
+      const cHeight = specs.H_cm * scale;
+
+      const geometry = new THREE.BoxGeometry(cLength, cHeight, cWidth);
+      const geoWire = new THREE.EdgesGeometry(geometry);
+      const matWire = new THREE.LineBasicMaterial({ color: 0x475569, linewidth: 2 });
+      containerBoxMesh = new THREE.LineSegments(geoWire, matWire);
+      containerBoxMesh.position.set(0, cHeight / 2, 0);
+      scene.add(containerBoxMesh);
+      
+      const placedBoxes = []; 
+      const overloadCargo = []; 
+      let totalLoadedVol = 0;
+      let totalLoadedWgt = 0;
+
+      let candidatePoints = [{ x: 0, y: 0, z: 0 }];
+
+      const itemsToPack = SELECTED_CARGO_ITEMS.map((item, idx) => {
+        const itemVol = (item.panjang_cm * item.lebar_cm * item.tinggi_cm) / 1000000;
+        return { ...item, originalIndex: idx, volumeM3: itemVol };
+      }).sort((a, b) => b.volumeM3 - a.volumeM3);
+
+      itemsToPack.forEach((cargo) => {
+        let loadedCount = 0;
+        const color = COLOR_PALETTE[cargo.originalIndex % COLOR_PALETTE.length];
+        const colorHex = COLOR_PALETTE_HEX[cargo.originalIndex % COLOR_PALETTE_HEX.length];
+
+        for (let i = 0; i < cargo.qty; i++) {
+          if (totalLoadedWgt + cargo.berat_kg > specs.maxWgt) {
+            const remainingQty = cargo.qty - loadedCount;
+            if (remainingQty > 0) {
+              overloadCargo.push({
+                nama_barang: cargo.nama_barang,
+                panjang_cm: cargo.panjang_cm,
+                lebar_cm: cargo.lebar_cm,
+                tinggi_cm: cargo.tinggi_cm,
+                qty: remainingQty,
+                vol: cargo.volumeM3 * remainingQty,
+                berat: cargo.berat_kg * remainingQty
+              });
+            }
+            break;
+          }
+
+          let isPlaced = false;
+          for (let pIdx = 0; pIdx < candidatePoints.length; pIdx++) {
+            const pt = candidatePoints[pIdx];
+            const p = cargo.panjang_cm;
+            const l = cargo.lebar_cm;
+            const t = cargo.tinggi_cm;
+
+            const orientations = [
+              { dx: p, dy: t, dz: l }, 
+              { dx: l, dy: t, dz: p }, 
+              { dx: p, dy: l, dz: t }, 
+              { dx: t, dy: l, dz: p }, 
+              { dx: l, dy: p, dz: t }, 
+              { dx: t, dy: p, dz: l }  
+            ];
+
+            for (let oIdx = 0; oIdx < orientations.length; oIdx++) {
+              const o = orientations[oIdx];
+              const boxTest = {
+                x1: pt.x,
+                y1: pt.y,
+                z1: pt.z,
+                x2: pt.x + o.dx,
+                y2: pt.y + o.dy,
+                z2: pt.z + o.dz,
+                colorHex: colorHex,
+                nama_barang: cargo.nama_barang,
+                berat_kg: cargo.berat_kg
+              };
+
+              if (boxTest.x2 <= specs.L_cm && boxTest.y2 <= specs.H_cm && boxTest.z2 <= specs.W_cm) {
+                let hasCollision = false;
+                for (let k = 0; k < placedBoxes.length; k++) {
+                  if (intersect3D(boxTest, placedBoxes[k])) {
+                    hasCollision = true;
+                    break;
+                  }
+                }
+
+                if (!hasCollision) {
+                  placedBoxes.push(boxTest);
+                  totalLoadedVol += cargo.volumeM3;
+                  totalLoadedWgt += cargo.berat_kg;
+                  loadedCount++;
+                  isPlaced = true;
+
+                  candidatePoints.push({ x: boxTest.x2, y: pt.y, z: pt.z }); 
+                  candidatePoints.push({ x: pt.x, y: pt.y, z: boxTest.z2 }); 
+                  candidatePoints.push({ x: pt.x, y: boxTest.y2, z: pt.z }); 
+
+                  candidatePoints.splice(pIdx, 1);
+                  candidatePoints = candidatePoints.filter(cp => cp.x < specs.L_cm && cp.y < specs.H_cm && cp.z < specs.W_cm);
+                  candidatePoints.sort((a, b) => {
+                    if (a.y !== b.y) return a.y - b.y; 
+                    if (a.x !== b.x) return a.x - b.x; 
+                    return a.z - b.z;                  
+                  });
+
+                  const itemWM = o.dx * scale;
+                  const itemHM = o.dy * scale;
+                  const itemDM = o.dz * scale;
+
+                  const boxGeometry = new THREE.BoxGeometry(itemWM - 0.015, itemHM - 0.015, itemDM - 0.015);
+                  const boxMaterial = new THREE.MeshPhongMaterial({
+                    color: color,
+                    shininess: 50,
+                    transparent: true,
+                    opacity: 0.92
+                  });
+                  const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
+
+                  const posX = -cLength / 2 + (pt.x * scale) + (itemWM / 2);
+                  const posY = (pt.y * scale) + (itemHM / 2);
+                  const posZ = -cWidth / 2 + (pt.z * scale) + (itemDM / 2);
+
+                  boxMesh.position.set(posX, posY, posZ);
+                  boxMesh.castShadow = true;
+                  boxMesh.receiveShadow = true;
+
+                  const edges = new THREE.EdgesGeometry(boxGeometry);
+                  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x0f172a, opacity: 0.55 }));
+                  boxMesh.add(line);
+
+                  scene.add(boxMesh);
+                  loadedCargoMeshes.push(boxMesh);
+                  break; 
+                }
+              }
+            }
+            if (isPlaced) break;
+          }
+
+          if (!isPlaced) {
+            const remainingQty = cargo.qty - loadedCount;
+            if (remainingQty > 0) {
+              overloadCargo.push({
+                nama_barang: cargo.nama_barang,
+                panjang_cm: cargo.panjang_cm,
+                lebar_cm: cargo.lebar_cm,
+                tinggi_cm: cargo.tinggi_cm,
+                qty: remainingQty,
+                vol: cargo.volumeM3 * remainingQty,
+                berat: cargo.berat_kg * remainingQty
+              });
+            }
+            break; 
+          }
+        }
+      });
+
+      LAST_PACKED_BOXES = placedBoxes;
+      LAST_OVERLOAD_CARGO = overloadCargo;
+      LAST_TOTALS = {
+        usedVol: totalLoadedVol,
+        maxVol: specs.maxVol,
+        usedWgt: totalLoadedWgt,
+        maxWgt: specs.maxWgt
+      };
+
+      const overloadPanel = document.getElementById('overloadContainerPanel');
+      const overloadTbody = document.getElementById('overloadTableBody');
+      
+      if (overloadCargo.length > 0) {
+        overloadPanel.classList.remove('hidden');
+        overloadTbody.innerHTML = "";
+        overloadCargo.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = "border-b border-red-100 hover:bg-red-100/50 transition";
+          tr.innerHTML = `
+            <td class="py-2 px-1 font-bold text-red-900">${escapeHTML(item.nama_barang)}</td>
+            <td class="py-2 px-1 text-center font-extrabold">${item.qty} Pcs</td>
+            <td class="py-2 px-1 text-center font-mono">${item.vol.toFixed(3)} m³</td>
+            <td class="py-2 px-1 text-center">${item.berat.toFixed(1)} kg</td>
+          `;
+          overloadTbody.appendChild(tr);
+        });
+        showToast("Perhatian: Beberapa muatan melebihi batas ruang/berat kontainer!", "warning");
+      } else {
+        overloadPanel.classList.add('hidden');
+        overloadTbody.innerHTML = "";
+      }
+
+      updateUtilisationGauges(totalLoadedVol, specs.maxVol, totalLoadedWgt, specs.maxWgt);
+
+      if (activeMenu === 'report') renderReportPage();
+      setTimeout(() => { document.getElementById('loading3DIndicator').classList.add('hidden'); }, 350);
+    }
+
+    function render2DLayoutProjections() {
+      const specs = LAST_CONTAINER_SPEC;
+      if (!specs || !specs.L_cm) return;
+
+      drawCanvasProjection('canvas2dTop', specs, 'top');
+      drawCanvasProjection('canvas2dSide', specs, 'side');
+    }
+
+    function drawCanvasProjection(canvasId, specs, viewType) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      ctx.clearRect(0, 0, w, h);
+      const margin = 20;
+      const dWidth = w - (margin * 2);
+      const dHeight = h - (margin * 2);
+
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(margin, margin, dWidth, dHeight);
+      ctx.setLineDash([]); 
+
+      ctx.fillStyle = '#fafafa';
+      ctx.fillRect(margin, margin, dWidth, dHeight);
+
+      ctx.strokeStyle = '#f1f5f9';
+      ctx.lineWidth = 0.5;
+      for (let i = 1; i < 10; i++) {
+        const gridX = margin + (dWidth * i) / 10;
+        ctx.beginPath();
+        ctx.moveTo(gridX, margin);
+        ctx.lineTo(gridX, margin + dHeight);
+        ctx.stroke();
+      }
+
+      const scaleX = dWidth / specs.L_cm;
+      const scaleY = dHeight / (viewType === 'top' ? specs.W_cm : specs.H_cm);
+
+      LAST_PACKED_BOXES.forEach(box => {
+        let rx, ry, rWidth, rHeight;
+        if (viewType === 'top') {
+          rx = margin + (box.x1 * scaleX);
+          ry = margin + (box.z1 * scaleY);
+          rWidth = (box.x2 - box.x1) * scaleX;
+          rHeight = (box.z2 - box.z1) * scaleY;
+        } else {
+          rx = margin + (box.x1 * scaleX);
+          ry = margin + (specs.H_cm - box.y2) * scaleY;
+          rWidth = (box.x2 - box.x1) * scaleX;
+          rHeight = (box.y2 - box.y1) * scaleY;
+        }
+
+        ctx.fillStyle = box.colorHex || '#3b82f6';
+        ctx.globalAlpha = 0.85;
+        ctx.fillRect(rx + 0.5, ry + 0.5, Math.max(rWidth - 1, 1), Math.max(rHeight - 1, 1));
+
+        ctx.strokeStyle = '#020617';
+        ctx.lineWidth = 0.5;
+        ctx.globalAlpha = 1.0;
+        ctx.strokeRect(rx, ry, rWidth, rHeight);
+      });
+    }
+
+    function renderReportPage() {
+      const now = new Date();
+      document.getElementById('reportPrintDate').innerText = now.toLocaleString('id-ID');
+      document.getElementById('reportOperator').innerText = CURRENT_USER ? CURRENT_USER.nama : "Administrator";
+
+      const specs = LAST_CONTAINER_SPEC;
+      if (!specs || !specs.L_cm) {
+        showToast("Tolong lakukan kalkulasi kargo terlebih dahulu di menu Kalkulator!", "warning");
+        return;
+      }
+
+      document.getElementById('reportProjectName').innerText = document.getElementById('project_name').value.trim() || "Proyek Tanpa Nama";
+      document.getElementById('reportContainerName').innerText = specs.nama;
+      document.getElementById('reportMaxVol').innerText = specs.maxVol.toFixed(2) + " m³";
+      document.getElementById('reportMaxWeight').innerText = specs.maxWgt.toLocaleString('id-ID') + " kg";
+
+      const volPercent = Math.min((LAST_TOTALS.usedVol / specs.maxVol) * 100, 100);
+      const wgtPercent = Math.min((LAST_TOTALS.usedWgt / specs.maxWgt) * 100, 100);
+
+      document.getElementById('reportVolPercent').innerText = volPercent.toFixed(2) + "%";
+      document.getElementById('reportVolProgressBar').style.width = volPercent + "%";
+      document.getElementById('reportVolUsed').innerText = LAST_TOTALS.usedVol.toFixed(2) + " m³";
+      document.getElementById('reportVolRem').innerText = Math.max(specs.maxVol - LAST_TOTALS.usedVol, 0).toFixed(2) + " m³";
+
+      document.getElementById('reportWeightPercent').innerText = wgtPercent.toFixed(2) + "%";
+      document.getElementById('reportWeightProgressBar').style.width = wgtPercent + "%";
+      document.getElementById('reportWeightUsed').innerText = LAST_TOTALS.usedWgt.toLocaleString('id-ID') + " kg";
+      document.getElementById('reportWeightRem').innerText = Math.max(specs.maxWgt - LAST_TOTALS.usedWgt, 0).toLocaleString('id-ID') + " kg";
+
+      // DETAILED AI EVALUATIONS FOR REPORT METRICS
+      const totalWeight = LAST_TOTALS.usedWgt;
+      let polaPenataan = "Gravity-Heuristic Stack (Mengikuti Sisi Panjang X)";
+      let stackingIndex = "Maksimal 5-7 Tingkat (Tergantung tinggi boks)";
+      let rekomendasiRuang = "Utilisasi ruang sangat baik. Sisa ruang kosong aman.";
+      let distribusiBeban = "Simetris Merata (Titik Berat Berada di Tengah Kontainer)";
+      let stabilitasStruktural = "Sangat Baik (Kerentanan Lendutan Rendah)";
+      let rekomendasiSafety = "Lakukan pengikatan (lashing) standar pada baris belakang.";
+
+      if (volPercent > 85) {
+        rekomendasiRuang = "Kepadatan tinggi. Tidak perlu dunnage bag tambahan karena boks sudah mengunci satu sama lain secara alami.";
+      } else if (volPercent > 50) {
+        rekomendasiRuang = "Kepadatan sedang. Gunakan dunnage bag / airbag pengisi celah pada sisi kosong untuk menahan pergeseran lateral.";
+      } else {
+        rekomendasiRuang = "Kepadatan rendah. Sangat disarankan memusatkan boks di tengah bawah dan mengikatnya dengan lashing belt ke dinding kontainer.";
+      }
+
+      if (totalWeight > specs.maxWgt * 0.8) {
+        distribusiBeban = "Sangat Berat (Titik Berat Rendah). Memerlukan perhatian pada suspensi belakang armada pengangkut.";
+        stabilitasStruktural = "Beban Kritis (Risiko deformasi dasar kontainer meningkat jika terjadi hentakan keras).";
+        rekomendasiSafety = "Wajib pasang shoring (balok penyangga kayu) di lantai dasar dan gunakan lashing belt bersertifikasi kekuatan tinggi.";
+      } else if (totalWeight > specs.maxWgt * 0.5) {
+        distribusiBeban = "Beban Sedang (Stabil). Distribusi berat optimal di sasis.";
+        stabilitasStruktural = "Sangat Stabil (Toleransi defleksi boks terkendali dengan baik).";
+        rekomendasiSafety = "Pasang jaring penahan (cargo net) di pintu kontainer untuk mencegah boks runtuh saat pintu dibuka.";
+      }
+
+      if (LAST_PACKED_BOXES.length > 0) {
+        let minHeight = 999999;
+        LAST_PACKED_BOXES.forEach(b => {
+          const h = b.y2 - b.y1;
+          if (h < minHeight && h > 0) minHeight = h;
+        });
+        const layers = Math.floor(specs.H_cm / minHeight);
+        stackingIndex = `Maksimal ${layers} Tingkat (Berdasarkan tinggi nominal boks terkecil ${minHeight.toFixed(0)} cm)`;
+      }
+
+      document.getElementById('reportAiPola').innerText = polaPenataan;
+      document.getElementById('reportAiStacking').innerText = stackingIndex;
+      document.getElementById('reportAiSpaceAdvice').innerText = rekomendasiRuang;
+      document.getElementById('reportAiBeban').innerText = distribusiBeban;
+      document.getElementById('reportAiDefleksi').innerText = stabilitasStruktural;
+      document.getElementById('reportAiSafetyAdvice').innerText = rekomendasiSafety;
+
+      render2DLayoutProjections();
+
+      const tbodyLoaded = document.getElementById('reportLoadedTableBody');
+      tbodyLoaded.innerHTML = "";
+
+      const packedCounts = {};
+      LAST_PACKED_BOXES.forEach(box => {
+        if (!packedCounts[box.nama_barang]) {
+          packedCounts[box.nama_barang] = {
+            qty: 0,
+            dimensi: (box.x2 - box.x1) + "x" + (box.y2 - box.y1) + "x" + (box.z2 - box.z1),
+            vol: ((box.x2 - box.x1) * (box.y2 - box.y1) * (box.z2 - box.z1)) / 1000000,
+            berat_unit: box.berat_kg,
+            color: box.colorHex
+          };
+        }
+        packedCounts[box.nama_barang].qty++;
+      });
+
+      const packedKeys = Object.keys(packedCounts);
+      if (packedKeys.length === 0) {
+        tbodyLoaded.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400 italic">Belum ada barang yang berhasil dimuat.</td></tr>`;
+      } else {
+        packedKeys.forEach(name => {
+          const item = packedCounts[name];
+          const totalVol = item.vol * item.qty;
+          const totalWgt = item.berat_unit * item.qty;
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-50 border-b border-slate-100";
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-3.5 h-3.5 inline-block rounded border border-slate-300" style="background-color: ${item.color}"></span>
+              ${escapeHTML(name)}
+            </td>
+            <td class="py-2.5 px-2 text-center font-mono text-[11px]">${item.dimensi} cm</td>
+            <td class="py-2.5 px-2 text-center text-slate-500">${item.vol.toFixed(4)} m³</td>
+            <td class="py-2.5 px-2 text-center text-slate-500">${item.berat_unit} kg</td>
+            <td class="py-2.5 px-2 text-center font-extrabold text-brand-600">${item.qty} Unit</td>
+            <td class="py-2.5 px-2 text-center font-bold">${totalVol.toFixed(2)} m³</td>
+            <td class="py-2.5 px-3 text-right font-bold text-slate-800">${totalWgt.toFixed(1)} kg</td>
+          `;
+          tbodyLoaded.appendChild(tr);
+        });
+      }
+
+      const overloadWrapper = document.getElementById('reportOverloadWrapper');
+      const tbodyOverload = document.getElementById('reportOverloadTableBody');
+      tbodyOverload.innerHTML = "";
+
+      if (LAST_OVERLOAD_CARGO.length > 0) {
+        overloadWrapper.classList.remove('hidden');
+        LAST_OVERLOAD_CARGO.forEach(item => {
+          const itemVol = (item.panjang_cm * item.lebar_cm * item.tinggi_cm) / 1000000;
+          const tr = document.createElement('tr');
+          tr.className = "border-b border-red-100 bg-red-50/20";
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-bold text-red-900">${escapeHTML(item.nama_barang)}</td>
+            <td class="py-2.5 px-2 text-center font-mono text-red-700">${item.panjang_cm}x${item.lebar_cm}x${item.tinggi_cm} cm</td>
+            <td class="py-2.5 px-2 text-center">${itemVol.toFixed(4)} m³</td>
+            <td class="py-2.5 px-2 text-center">${(item.berat / item.qty).toFixed(1)} kg</td>
+            <td class="py-2.5 px-2 text-center font-extrabold text-red-600">${item.qty} Unit</td>
+            <td class="py-2.5 px-2 text-center font-bold text-red-700">${item.vol.toFixed(3)} m³</td>
+            <td class="py-2.5 px-3 text-right font-bold text-red-900">${item.berat.toFixed(1)} kg</td>
+          `;
+          tbodyOverload.appendChild(tr);
+        });
+      } else {
+        overloadWrapper.classList.add('hidden');
+      }
+    }
+
+    function triggerPrintProcess() {
+      showToast("Mengekspor laporan ke format PDF...", "warning");
+      setLoader(true, "Mempersiapkan Dokumen PDF...");
+
+      setTimeout(() => {
+        const reportElement = document.getElementById('pdf-report-content');
+        const projectName = document.getElementById('project_name').value.trim() || "Proyek_Kargo";
+        
+        const pdfOptions = {
+          margin:       [10, 10, 10, 10],
+          filename:     `Cargo3D_Report_${projectName.replace(/\s+/g, '_')}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(reportElement).set(pdfOptions).save()
+          .then(() => {
+            setLoader(false);
+            showToast("Laporan PDF berhasil diunduh!", "success");
+          })
+          .catch(error => {
+            console.error("Gagal melakukan konversi html2pdf:", error);
+            setLoader(false);
+            showToast("Kendala unduh PDF otomatis. Mencoba cetak sistem...", "warning");
+            try { window.print(); } catch (err) { showToast("Pencetakan gagal.", "danger"); }
+          });
+      }, 500);
+    }
+
+    function saveCurrentCalculationToHistory() {
+      const projName = document.getElementById('project_name').value.trim();
+      const containerType = document.getElementById('container_type').value;
+
+      if (!projName) {
+        showToast("Tolong tulis nama proyek / klien terlebih dahulu!", "warning");
+        return;
+      }
+      if (SELECTED_CARGO_ITEMS.length === 0) {
+        showToast("Tidak ada kargo di dalam daftar untuk disimpan!", "warning");
+        return;
+      }
+
+      setLoader(true, "Menyimpan data ke server...");
+
+      let totalVol = 0;
+      let totalWgt = 0;
+      let totalPcs = 0;
+      SELECTED_CARGO_ITEMS.forEach(c => {
+        const itemVol = (c.panjang_cm * c.lebar_cm * c.tinggi_cm) / 1000000;
+        totalVol += itemVol * c.qty;
+        totalWgt += c.berat_kg * c.qty;
+        totalPcs += c.qty;
+      });
+
+      const specs = CONTAINER_SPECS[containerType];
+      const pVol = (totalVol / specs.maxVol) * 100;
+      const pWgt = (totalWgt / specs.maxWgt) * 100;
+
+      const payload = {
+        tanggal: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        username: CURRENT_USER ? CURRENT_USER.username : "lokal",
+        nama_proyek: projName,
+        tipe_container: specs.nama,
+        total_barang: totalPcs,
+        vol_terpakai: Number(totalVol.toFixed(2)),
+        persen_vol: Number(pVol.toFixed(2)),
+        berat_terpakai: Number(totalWgt.toFixed(1)),
+        persen_berat: Number(pWgt.toFixed(2)),
+        rincian_json: JSON.stringify(SELECTED_CARGO_ITEMS)
+      };
+
+      if (IS_PREVIEW) {
+        payload.id_kalkulasi = "calc-" + Date.now();
+        DB_RIWAYAT.push(payload);
+        showToast("Perhitungan tersimpan sukses (Lokal Preview)!", "success");
+        refreshAllTablesAndIndicators();
+        
+        SELECTED_CARGO_ITEMS = [];
+        renderLoadedCargoTable();
+        document.getElementById('project_name').value = "";
+        executeSimulationEngine();
+        setLoader(false);
+      } else {
+        callServerAPI("saveRiwayat", payload, () => {
+          showToast("Data perhitungan disinkronkan langsung ke Google Sheets!", "success");
+          fetchServerData();
+          SELECTED_CARGO_ITEMS = [];
+          renderLoadedCargoTable();
+          document.getElementById('project_name').value = "";
+          executeSimulationEngine();
+        });
+      }
+    }
+
+    function renderHistoryTable() {
+      const tbody = document.getElementById('historyTableBody');
+      tbody.innerHTML = "";
+
+      if (DB_RIWAYAT.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 italic">Belum ada riwayat perhitungan disimpan.</td></tr>`;
+        return;
+      }
+
+      DB_RIWAYAT.forEach(h => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-slate-500 font-mono text-[11px]">${h.tanggal}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${escapeHTML(h.nama_proyek)}</td>
+          <td class="py-3 px-4 text-center font-semibold text-slate-600">${h.tipe_container}</td>
+          <td class="py-3 px-4 text-center">${h.total_barang} Pcs</td>
+          <td class="py-3 px-4 text-center"><span class="font-bold text-brand-600">${h.vol_terpakai} m³</span> (${h.persen_vol}%)</td>
+          <td class="py-3 px-4 text-center"><span class="font-bold text-emerald-600">${h.berat_terpakai} kg</span> (${h.persen_berat}%)</td>
+          <td class="py-3 px-4 text-right space-x-1 shrink-0">
+            <button onclick="loadHistoryToCalculator('${h.id_kalkulasi}')" class="text-brand-600 hover:text-white bg-brand-50 hover:bg-brand-600 p-1.5 rounded-lg transition" title="Load ke 3D Simulator"><i class="fa-solid fa-cloud-arrow-up"></i> Muat</button>
+            <button onclick="deleteHistory('${h.id_kalkulasi}')" class="text-red-500 hover:text-white bg-red-50 hover:bg-red-500 p-1.5 rounded-lg transition" title="Hapus Riwayat"><i class="fa-solid fa-trash-can"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function loadHistoryToCalculator(id_calc) {
+      const item = DB_RIWAYAT.find(h => h.id_kalkulasi === id_calc);
+      if (item) {
+        SELECTED_CARGO_ITEMS = JSON.parse(item.rincian_json);
+        document.getElementById('project_name').value = item.nama_proyek;
+
+        let cType = "40hc";
+        if (item.tipe_container.includes("20")) cType = "20ft";
+        else if (item.tipe_container.includes("Standard") && item.tipe_container.includes("40")) cType = "40ft";
+        document.getElementById('container_type').value = cType;
+
+        showToast("Riwayat muat berhasil di-load ke simulator kargo 3D!", "success");
+        switchMenu('calculator');
+        renderLoadedCargoTable();
+        executeSimulationEngine();
+      }
+    }
+
+    function deleteHistory(id_calc) {
+      openConfirmDelete("Yakin ingin menghapus berkas arsip perhitungan ini secara permanen?", () => {
+        if (IS_PREVIEW) {
+          DB_RIWAYAT = DB_RIWAYAT.filter(h => h.id_kalkulasi !== id_calc);
+          showToast("Arsip lokal dihapus!", "success");
+          refreshAllTablesAndIndicators();
+        } else {
+          callServerAPI("deleteRiwayat", { id_kalkulasi: id_calc }, () => {
+            showToast("Sukses menghapus riwayat!", "success");
+            fetchServerData();
+          });
+        }
+      });
+    }
+
+    function escapeHTML(str) {
+      if (!str) return "";
+      return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+    }
+
+    function changeLanguage(lang) {
+      CURRENT_LANG = lang;
+      document.querySelectorAll('[data-translate]').forEach(el => {
+        const key = el.getAttribute('data-translate');
+        if (TRANSLATIONS[lang][key]) el.innerText = TRANSLATIONS[lang][key];
+      });
+
+      const btnId = document.getElementById('lang-btn-id');
+      const btnEn = document.getElementById('lang-btn-en');
+      if (lang === 'id') {
+        btnId.className = "px-2.5 py-1 rounded font-bold transition flex items-center gap-1.5 bg-white text-slate-800 border border-slate-300";
+        btnEn.className = "px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 text-slate-500 hover:text-slate-800";
+      } else {
+        btnEn.className = "px-2.5 py-1 rounded font-bold transition flex items-center gap-1.5 bg-white text-slate-800 border border-slate-300";
+        btnId.className = "px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1.5 text-slate-500 hover:text-slate-800";
+      }
+    }
+
+    function resetToDefaultSettings() {
+      APP_SETTINGS = {
+        appTitle: "Cargo3D Calculator",
+        appDesc: "Sistem Kalkulasi & Visualisasi Kontainer 3D",
+        logoUrl: "",
+        themeColor: "#ff5a1f",
+        createdBy: "Administrator",
+        trademark: "Cargo3D Loader V2.1 Pro"
+      };
+      applyBrandingSettings();
+      populateSettingsInputs();
+      localStorage.removeItem('CARGO3D_BRANDING_SETTINGS');
+      showToast("Pengaturan dikembalikan ke default!", "success");
+    }
+
+    function saveAllSettings() {
+      APP_SETTINGS.appTitle = document.getElementById('set_appTitle').value.trim();
+      APP_SETTINGS.appDesc = document.getElementById('set_appDesc').value.trim();
+      APP_SETTINGS.createdBy = document.getElementById('set_createdBy').value.trim();
+      APP_SETTINGS.trademark = document.getElementById('set_trademark').value.trim();
+      APP_SETTINGS.logoUrl = document.getElementById('set_logoUrl').value.trim();
+      APP_SETTINGS.themeColor = document.getElementById('set_themeColorHex').value.trim();
+
+      applyBrandingSettings();
+      localStorage.setItem('CARGO3D_BRANDING_SETTINGS', JSON.stringify(APP_SETTINGS));
+      showToast("Seluruh pengaturan branding berhasil disimpan!", "success");
+    }
+
+    // --- PWA: registrasi service worker (offline + installable) ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((err) => {
+          console.warn('Service worker gagal didaftarkan:', err);
+        });
+      });
+    }
+
+    // --- PWA: tombol "Install Aplikasi" (Chrome/Edge/Android) ---
+    let deferredInstallPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      document.getElementById('installAppBtn')?.classList.remove('hidden');
+      document.getElementById('installAppBtn')?.classList.add('flex');
+      document.getElementById('installAppBtnMobile')?.classList.remove('hidden');
+      document.getElementById('installAppBtnMobile')?.classList.add('flex');
+    });
+
+    function triggerInstallPrompt() {
+      if (!deferredInstallPrompt) {
+        showToast("Aplikasi sudah terpasang, atau browser ini belum mendukung instalasi langsung.", "warning");
+        return;
+      }
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then((choice) => {
+        if (choice.outcome === 'accepted') {
+          showToast("Aplikasi sedang dipasang ke perangkat...", "success");
+        }
+        deferredInstallPrompt = null;
+        document.getElementById('installAppBtn')?.classList.add('hidden');
+        document.getElementById('installAppBtnMobile')?.classList.add('hidden');
+      });
+    }
+
+    window.addEventListener('appinstalled', () => {
+      document.getElementById('installAppBtn')?.classList.add('hidden');
+      document.getElementById('installAppBtnMobile')?.classList.add('hidden');
+      showToast("Cargo3D Calculator berhasil dipasang!", "success");
+    });
+  </script>
+</body>
+</html>
